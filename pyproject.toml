@@ -1,0 +1,32 @@
+# Project metadata (see https://peps.python.org/pep-0621)
+[project]
+name = "fractal-ome-zarr-hcs-stitching"
+version = "0.0.1"
+description = "Fractal task(s) for registering and fusing OME-Zarr HCS"
+readme = "README.md"
+license = { text = "BSD-3-Clause" }
+authors = [
+    { name = "Marvin Albert", email = "marvin.albert@gmail.com" },
+]
+
+# Required Python version and dependencies
+requires-python = ">=3.8"
+dependencies = ["fractal-tasks-core == 1.0.0a1"]
+
+# Optional dependencies (e.g. for `pip install -e ".[dev]"`, see
+# https://peps.python.org/pep-0621/#dependencies-optional-dependencies)
+[project.optional-dependencies]
+dev = ["devtools", "pytest", "requests", "build", "jsonschema"]
+
+# Build options (see https://peps.python.org/pep-0517)
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["fractal_ome_zarr_hcs_stitching"]
+
+# Always include the __FRACTAL_MANIFEST__.json file in the package
+[tool.setuptools.package-data]
+"*" = ["__FRACTAL_MANIFEST__.json"]
