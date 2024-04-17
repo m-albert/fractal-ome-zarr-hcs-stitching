@@ -3,13 +3,13 @@
   "task_list": [
     {
       "name": "Thresholding Task",
-      "executable_parallel": "thresholding_task.py",
+      "executable_parallel": "stitching_task.py",
       "meta_parallel": {
         "cpus_per_task": 1,
         "mem": 4000
       },
       "args_schema_parallel": {
-        "title": "ThresholdingTask",
+        "title": "StitchingTask",
         "type": "object",
         "properties": {
           "zarr_url": {
@@ -29,7 +29,7 @@
         ],
         "additionalProperties": false
       },
-      "docs_info": "## thresholding_task\nShort description of thresholding_task.\n\nLong description of thresholding_task.\n"
+      "docs_info": "## stitching_task\nShort description of stitching_task.\n\nLong description of stitching_task.\n"
     }
   ],
   "has_args_schemas": true,

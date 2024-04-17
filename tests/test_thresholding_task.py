@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from devtools import debug
 
-from fractal_ome_zarr_hcs_stitching.thresholding_task import thresholding_task
+from fractal_ome_zarr_hcs_stitching.stitching_task import stitching_task
 
 
 @pytest.fixture(scope="function")
@@ -19,5 +19,5 @@ def test_data_dir(tmp_path: Path) -> str:
     return dest_dir
 
 
-def test_thresholding_task(test_data_dir):
-    thresholding_task(zarr_url=test_data_dir)
+def test_stitching_task(test_data_dir):
+    stitching_task(zarr_url=test_data_dir)

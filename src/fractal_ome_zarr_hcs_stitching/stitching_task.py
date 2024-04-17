@@ -15,15 +15,15 @@ from fractal_tasks_core.ngff import load_NgffImageMeta
 from fractal_tasks_core.pyramids import build_pyramid
 
 @validate_arguments
-def thresholding_task(
+def stitching_task(
     *,
     zarr_url: str,
     another_parameter: int = 1,
 ) -> None:
     """
-    Short description of thresholding_task.
+    Short description of stitching_task.
 
-    Long description of thresholding_task.
+    Long description of stitching_task.
 
     Args:
         zarr_url: Absolute path to the OME-Zarr image.
@@ -45,15 +45,7 @@ def thresholding_task(
     array_czyx = da.from_zarr(f"{zarr_url}/0")
     logging.info(f"{array_czyx=}")
 
-    # Set values below 100 to 0
-    array_max = array_czyx.max().compute()
-    array_min = array_czyx.min().compute()
-    logging.info(f"Pre thresholding:  {array_min=}, {array_max=}")
-    array_czyx[array_czyx < 99] = 99
-    array_czyx[array_czyx > 1000] = 1000
-    array_max = array_czyx.max().compute()
-    array_min = array_czyx.min().compute()
-    logging.info(f"Post thresholding: {array_min=}, {array_max=}")
+    import pdb; pdb.set_trace()
 
     # Write the processed array back to the same full-resolution Zarr array
     array_czyx.to_zarr(f"{zarr_url}/0", overwrite=True)
@@ -71,4 +63,4 @@ def thresholding_task(
 if __name__ == "__main__":
     from fractal_tasks_core.tasks._utils import run_fractal_task
 
-    run_fractal_task(task_function=thresholding_task)
+    run_fractal_task(task_function=stitching_task)
