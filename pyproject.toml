@@ -11,7 +11,13 @@ authors = [
 
 # Required Python version and dependencies
 requires-python = ">=3.8"
-dependencies = ["fractal-tasks-core == 1.0.0a1"]
+dependencies = [
+    "fractal-tasks-core == 1.0.0a1",
+    "multiview-stitcher == 0.1.5",
+    "anndata",
+    "ome-zarr",
+    "spatial_image == 0.3.0",
+    ]
 
 # Optional dependencies (e.g. for `pip install -e ".[dev]"`, see
 # https://peps.python.org/pep-0621/#dependencies-optional-dependencies)
