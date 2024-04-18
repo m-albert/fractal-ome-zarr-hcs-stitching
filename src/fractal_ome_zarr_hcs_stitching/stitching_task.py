@@ -54,7 +54,8 @@ def stitching_task(
     TODO:
       - include and update output metadata / FOV ROI table
       - test 2D / 3D
-      - how to best determine num_levels for build_pyramid?
+      - optimize for large data
+      - figure out how to best determine num_levels for build_pyramid
       - currently optimized for search first mode, need to implement
         registration pair finding for "grid" (?) mode
 
