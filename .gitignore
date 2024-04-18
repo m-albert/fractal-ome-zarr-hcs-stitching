@@ -2,3 +2,4 @@ src/fractal_ome_zarr_hcs_stitching/__pycache__
 src/fractal_ome_zarr_hcs_stitching/dev/__pycache__
 src/fractal_ome_zarr_hcs_stitching.egg-info
 tests/__pycache__
+tests/data/*
