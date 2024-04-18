@@ -83,7 +83,7 @@ def get_tiles_from_sim(
         origin_original = {dim: row[f'{dim}_micrometer_original'] if dim != 'z' else 0 for dim in input_spatial_dims}
         extent_original = {dim: row[f'len_{dim}_micrometer'] for dim in input_spatial_dims}
 
-        tile = xim_well.sel({dim: slice(origin[dim], origin[dim] + extent[dim])
+        tile = xim_well.sel({dim: slice(origin[dim], origin[dim] + extent[dim] - 1e-6)
                             for dim in input_spatial_dims})
         
         tile = tile.squeeze(drop=True)
