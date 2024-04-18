@@ -1,6 +1,6 @@
 # fractal-ome-zarr-hcs-stitching
 
-Fractal task(s) for registering and fusing OME-Zarr HCS
+[Fractal](https://github.com/fractal-analytics-platform) task(s) for registering and fusing OME-Zarr HCS using [multiview-stitcher](https://github.com/multiview-stitcher/multiview-stitcher).
 
 ## Development instructions
 

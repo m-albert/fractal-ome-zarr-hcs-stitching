@@ -1,5 +1,5 @@
 """
-This is the Python module for my_task
+This is the Python module for sitching FOVs from an OME-Zarr image.
 """
 
 import logging
@@ -50,6 +50,8 @@ def stitching_task(
       - include and update output metadata / FOV ROI table
       - test 2D / 3D
       - how to determine num_levels for build_pyramid? fails
+      - currently optimized for search mode, need to implement
+        registration pair finding for "grid" mode
 
     Args:
         zarr_url: Absolute path to the OME-Zarr image.
@@ -76,14 +78,13 @@ def stitching_task(
     reg_channel_index = xim_well.coords['c']\
         .data.tolist().index(registration_channel_label)
     try:
-        with ProgressBar():
-            params = registration.register(
-                msims[:],
-                transform_key='fractal_original',
-                reg_channel_index=reg_channel_index,
-                new_transform_key='translation_registered',
-                registration_binning={'y': 2, 'x': 2},
-            )
+        params = registration.register(
+            msims[:],
+            transform_key='fractal_original',
+            reg_channel_index=reg_channel_index,
+            new_transform_key='translation_registered',
+            registration_binning={'y': 2, 'x': 2},
+        )
     except NotEnoughOverlapError:
         logging.error(f"Not enough overlap for stitching.")
         return
@@ -98,13 +99,12 @@ def stitching_task(
                     )
                 }
                     for ip, p in enumerate(params)
-                    if not np.allclose(p[0].data, np.eye(len(reg_spatial_dims) + 1))}
+                    if not np.allclose(p.sel(t=0).data, np.eye(len(reg_spatial_dims) + 1))}
     logging.info(f"Obtained shifts: {shifts}")
 
     sims = [msi_utils.get_sim_from_msim(msim) for msim in msims]
 
     logging.info(f"Started fusion")
-    # with dask.config.set(**{'array.slicing.split_large_chunks': False}):
     fused = fusion.fuse(
         sims[:],
         transform_key='translation_registered',
@@ -118,14 +118,7 @@ def stitching_task(
         fused = fused.expand_dims('z', xim_well.dims.index('z'))
 
     # get the dask array from the fused sim
-    fused_da = fused.data#[..., :2000, :2000]
-
-    # # Homogenize chunks (?)
-    # fused_da = da.pad(
-    #     fused_da,
-    #     [(0, int(cs - (s % cs)))
-    #         for cs, s in zip(fused_da.chunksize, fused_da.shape)])
-    # fused_da = fused_da.rechunk(xim_well.data.chunksize)
+    fused_da = fused.data
 
     # Write the fused array back to the same full-resolution Zarr array
     fused_da.to_zarr(f"{zarr_url}/fused/0", overwrite=True)

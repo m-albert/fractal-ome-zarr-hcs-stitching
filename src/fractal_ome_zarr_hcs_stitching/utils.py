@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pandas as pd
+
 import dask.array as da
 from spatial_image import to_spatial_image
 
@@ -10,7 +12,25 @@ from multiview_stitcher import spatial_image_utils as si_utils
 from multiview_stitcher import msi_utils, param_utils
 
 
-def get_sim_from_multiscales(multiscales_path, resolution):
+def get_sim_from_multiscales(
+    multiscales_path: Path,
+    resolution: int = 0,
+    ):
+    """
+    Get a spatial image from a multiscales ngff zarr file
+    representing a given resolution level.
+
+    Parameters
+    ----------
+    multiscales_path : Path
+        Path to the multiscales group in the Zarr file.
+    resolution : int, optional
+        Resolution level index, by default 0
+
+    Returns
+    -------
+    spatial_image.SpatialImage
+    """
 
     ngff_image_meta = load_NgffImageMeta(multiscales_path)
     axes = ngff_image_meta.axes_names
@@ -34,7 +54,24 @@ def get_sim_from_multiscales(multiscales_path, resolution):
     return sim
 
 
-def get_tiles_from_sim(xim_well, fov_roi_table):
+def get_tiles_from_sim(
+    xim_well,
+    fov_roi_table: pd.DataFrame,
+    ):
+    """
+    _summary_
+
+    Parameters
+    ----------
+    xim_well : spatial_image.SpatialImage
+        Array representing the well.
+    fov_roi_table : pd.DataFrame
+        Table with the FOV ROIs.
+
+    Returns
+    -------
+    list of multiscale_spatial_image (multiview-stitcher flavor)
+    """
 
     input_spatial_dims = [dim for dim in xim_well.dims if dim in ["z", "y", "x"]]
     msims = []
