@@ -2,7 +2,7 @@
   "manifest_version": "2",
   "task_list": [
     {
-      "name": "Thresholding Task",
+      "name": "Stitching Task",
       "executable_parallel": "stitching_task.py",
       "meta_parallel": {
         "cpus_per_task": 1,
@@ -17,11 +17,29 @@
             "type": "string",
             "description": "Absolute path to the OME-Zarr image."
           },
-          "another_parameter": {
-            "title": "Another Parameter",
+          "output_group_name": {
+            "title": "Output Group Name",
+            "default": "fused",
+            "type": "string",
+            "description": "Name of the group to write the fused image to."
+          },
+          "registration_channel_label": {
+            "title": "Registration Channel Label",
+            "default": "DAPI",
+            "type": "string",
+            "description": "Label of the channel to use for registration."
+          },
+          "registration_binning_xy": {
+            "title": "Registration Binning Xy",
             "default": 1,
             "type": "integer",
-            "description": "An arbitrary parameter."
+            "description": "Binning factor for XY axes during registration."
+          },
+          "registration_binning_z": {
+            "title": "Registration Binning Z",
+            "default": 1,
+            "type": "integer",
+            "description": "Binning factor for Z axis during registration (if present)."
           }
         },
         "required": [
@@ -29,7 +47,7 @@
         ],
         "additionalProperties": false
       },
-      "docs_info": "## stitching_task\nShort description of stitching_task.\n\nLong description of stitching_task.\n"
+      "docs_info": "## stitching_task\nStitches FOVs from an OME-Zarr image.\n\nPerforms registration and fusion of FOVs indicated\nin the FOV_ROI_table of the OME-Zarr image. Writes the\nfused image back to a \"fused\" group in the same Zarr array.\n\nTODO:\n  - include and update output metadata / FOV ROI table\n  - test 2D / 3D\n  - how to best determine num_levels for build_pyramid?\n  - currently optimized for search first mode, need to implement\n    registration pair finding for \"grid\" (?) mode\n"
     }
   ],
   "has_args_schemas": true,
