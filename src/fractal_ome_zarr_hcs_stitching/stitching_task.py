@@ -34,6 +34,7 @@ from multiview_stitcher import (
 from multiview_stitcher.mv_graph import NotEnoughOverlapError
 from multiview_stitcher import spatial_image_utils as si_utils
 
+logger = logging.getLogger(__name__)
 
 @validate_arguments
 def stitching_task(
@@ -68,15 +69,16 @@ def stitching_task(
     """
 
     # Use the first of input_paths
+    print("Test!")
     logging.info(f"{zarr_url=}")
 
     # Parse and log several NGFF-image metadata attributes
     ngff_image_meta = load_NgffImageMeta(zarr_url)
-    logging.info(f"  Axes: {ngff_image_meta.axes_names}")
-    logging.info(f"  Number of pyramid levels: {ngff_image_meta.num_levels}")
-    logging.info(f"  Linear coarsening factor for YX axes: {ngff_image_meta.coarsening_xy}")
-    logging.info(f"  Full-resolution ZYX pixel sizes (micrometer):    {ngff_image_meta.get_pixel_sizes_zyx(level=0)}")
-    logging.info(f"  Coarsening-level-1 ZYX pixel sizes (micrometer): {ngff_image_meta.get_pixel_sizes_zyx(level=1)}")
+    logger.info(f"  Axes: {ngff_image_meta.axes_names}")
+    logger.info(f"  Number of pyramid levels: {ngff_image_meta.num_levels}")
+    logger.info(f"  Linear coarsening factor for YX axes: {ngff_image_meta.coarsening_xy}")
+    logger.info(f"  Full-resolution ZYX pixel sizes (micrometer):    {ngff_image_meta.get_pixel_sizes_zyx(level=0)}")
+    logger.info(f"  Coarsening-level-1 ZYX pixel sizes (micrometer): {ngff_image_meta.get_pixel_sizes_zyx(level=1)}")
 
     # Load FOVs for registration
     xim_well = get_sim_from_multiscales(Path(zarr_url), 0) # could also be lower resolution
@@ -90,11 +92,11 @@ def stitching_task(
     # Registration
     ##############
 
-    logging.info(f"Started registration")
-    logging.info(f"Registration channel: {registration_channel_label}")
-    logging.info(f"Registration binning XY: {registration_binning_xy}")
-    logging.info(f"Registration binning Z: {registration_binning_z}")
-    logging.info(f"Registration spatial dims: {reg_spatial_dims}")
+    logger.info(f"Started registration")
+    logger.info(f"Registration channel: {registration_channel_label}")
+    logger.info(f"Registration binning XY: {registration_binning_xy}")
+    logger.info(f"Registration binning Z: {registration_binning_z}")
+    logger.info(f"Registration spatial dims: {reg_spatial_dims}")
 
     reg_channel_index = xim_well.coords['c']\
         .data.tolist().index(registration_channel_label)
@@ -115,10 +117,10 @@ def stitching_task(
                 },
         )
     except NotEnoughOverlapError:
-        logging.warning(f"Not enough overlap for stitching.")
+        logger.warning(f"Not enough overlap for stitching.")
         fusion_transform_key = 'fractal_original'
 
-    logging.info(f"Finished registration")
+    logger.info(f"Finished registration")
 
     shifts = {ip:
                 {dim: s for dim, s in zip(
@@ -128,7 +130,7 @@ def stitching_task(
                 }
                     for ip, p in enumerate(params)
                     if not np.allclose(p.sel(t=0).data, np.eye(len(reg_spatial_dims) + 1))}
-    logging.info(f"Obtained shifts: {shifts}")
+    logger.info(f"Obtained shifts: {shifts}")
 
     ########
     # Fusion
@@ -136,7 +138,7 @@ def stitching_task(
 
     sims = [msi_utils.get_sim_from_msim(msim) for msim in msims]
 
-    logging.info(f"Started fusion using transform key {fusion_transform_key}")
+    logger.info(f"Started fusion using transform key {fusion_transform_key}")
     fused = fusion.fuse(
         sims[:],
         transform_key=fusion_transform_key,
@@ -156,8 +158,9 @@ def stitching_task(
     # rechunk the fused array to match the original array
     fused_da = fused_da.rechunk(xim_well.data.chunksize)
 
+    # FIXME: Move output_zarr_url to well level
     output_zarr_url = f"{zarr_url}/{output_group_name}"
-    logging.info(f"Output fused path: {output_zarr_url}")
+    logger.info(f"Output fused path: {output_zarr_url}")
 
     # Write the fused array back to the same full-resolution Zarr array
     fused_da = fused_da.to_zarr(
@@ -167,9 +170,9 @@ def stitching_task(
         return_stored=True,
         compute=True)
 
-    logging.info(f"Finished fusion")
+    logger.info(f"Finished fusion")
 
-    logging.info(f"Started building resolution pyramid")
+    logger.info(f"Started building resolution pyramid")
 
     # Starting from on-disk full-resolution data, build and write to disk a
     # pyramid of coarser levels
@@ -186,6 +189,7 @@ def stitching_task(
     # attach metadata to the fused image
     store = parse_url(output_zarr_url, mode="w").store
     output_group = zarr.group(store=store)
+    # FIXME: Add Omero metadata
     writer.write_multiscales_metadata(
         group=output_group,
         axes=ngff_image_meta.axes_names,
@@ -205,8 +209,8 @@ def stitching_task(
         ]
     )
 
-    logging.info(f"Finished building resolution pyramid")
-    logging.info(f"Done stitching")
+    logger.info(f"Finished building resolution pyramid")
+    logger.info(f"Done stitching")
 
 
 if __name__ == "__main__":
