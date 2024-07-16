@@ -4,7 +4,9 @@ This is the Python module for sitching FOVs from an OME-Zarr image.
 
 import logging
 from typing import Any
+import os
 from pathlib import Path
+import shutil
 
 import zarr
 from ome_zarr import writer
@@ -24,6 +26,10 @@ from fractal_ome_zarr_hcs_stitching.utils import (
     get_sim_from_multiscales,
     get_tiles_from_sim,
 )
+from fractal_tasks_core.tasks._zarr_utils import (
+    _split_well_path_image_path,
+    _update_well_metadata,
+)
 
 from multiview_stitcher import (
     registration,
@@ -40,8 +46,9 @@ logger = logging.getLogger(__name__)
 def stitching_task(
     *,
     zarr_url: str,
-    output_group_name: str = "fused",
     registration_channel_label: str = "DAPI",
+    overwrite_input: bool = False,
+    output_group_suffix: str = "fused",
     registration_binning_xy: int = 1,
     registration_binning_z: int = 1,
 ) -> None:
@@ -61,14 +68,16 @@ def stitching_task(
 
     Args:
         zarr_url: Absolute path to the OME-Zarr image.
-        output_group_name: Name of the group to write the fused image to.
         registration_channel_label: Label of the channel to use for registration.
+        overwrite_input: Whether to override the original, not stitched image 
+            with the output of this task.
+        output_group_suffix: Suffix of the new OME-Zarr image to write the 
+            fused image to.
         registration_binning_xy: Binning factor for XY axes during registration.
         registration_binning_z: Binning factor for Z axis during registration (if present).
     """
 
     # Use the first of input_paths
-    print("Test!")
     logging.info(f"{zarr_url=}")
 
     # Parse and log several NGFF-image metadata attributes
@@ -159,7 +168,9 @@ def stitching_task(
     fused_da = fused_da.rechunk(xim_well.data.chunksize)
 
     # FIXME: Move output_zarr_url to well level
-    output_zarr_url = f"{zarr_url}/{output_group_name}"
+    # Use `_update_well_metadata` to update well metadata
+    well_url, old_img_path = _split_well_path_image_path(zarr_url)
+    output_zarr_url = f"{well_url}/{zarr_url.split('/')[-1]}_{output_group_suffix}"
     logger.info(f"Output fused path: {output_zarr_url}")
 
     # Write the fused array back to the same full-resolution Zarr array
@@ -176,10 +187,15 @@ def stitching_task(
 
     # Starting from on-disk full-resolution data, build and write to disk a
     # pyramid of coarser levels
+    # How to determine number of levels and coarsening factors?
+    # `build_pyramid`` fails with certain combinations of shape and num_levels
+    # Original levels are stored in ngff_image_meta.num_levels. But 5 levels 
+    # fails on test data
+    output_num_levels = 4
     build_pyramid(
         zarrurl=output_zarr_url,
         overwrite=True,
-        num_levels=ngff_image_meta.num_levels,
+        num_levels=output_num_levels,
         coarsening_xy=ngff_image_meta.coarsening_xy,
     )
 
@@ -203,12 +219,36 @@ def stitching_task(
                     for coordinateTransformation in fractal_ds.coordinateTransformations
                     ]
             }
-            for fractal_ds in ngff_image_meta.multiscales[0].datasets[:ngff_image_meta.num_levels]
+            for fractal_ds in ngff_image_meta.multiscales[0].datasets[:output_num_levels]
         ],
         metadata=dict(omero = dict(channels = [channel.dict() for channel in ngff_image_meta.omero.channels]))
     )
 
     logger.info(f"Finished building resolution pyramid")
+
+    ####################
+    # Clean up Zarr file
+    ####################
+    if overwrite_input:
+        logger.info(
+            "Replace original zarr image with the newly created Zarr image"
+        )
+        os.rename(zarr_url, f"{zarr_url}_tmp")
+        os.rename(output_zarr_url, zarr_url)
+        shutil.rmtree(f"{zarr_url}_tmp")        
+    else:
+        image_list_updates = dict(
+            image_list_updates=[dict(zarr_url=output_zarr_url, origin=zarr_url)]
+        )
+        # Update the metadata of the the well
+        well_url, new_img_path = _split_well_path_image_path(output_zarr_url)
+        _update_well_metadata(
+            well_url=well_url,
+            old_image_path=old_img_path,
+            new_image_path=new_img_path,
+        )
+        return image_list_updates
+
     logger.info(f"Done stitching")
 
 
