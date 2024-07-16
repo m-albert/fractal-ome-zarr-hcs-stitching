@@ -56,7 +56,6 @@ def stitching_task(
       - include and update output metadata / FOV ROI table
       - test 2D / 3D
       - optimize for large data
-      - figure out how to best determine num_levels for build_pyramid
       - currently optimized for search first mode, need to implement
         registration pair finding for "grid" (?) mode
 
@@ -136,6 +135,7 @@ def stitching_task(
     # Fusion
     ########
 
+    # FIXME: Something in the fusion changes channel index order. Unclear what
     sims = [msi_utils.get_sim_from_msim(msim) for msim in msims]
 
     logger.info(f"Started fusion using transform key {fusion_transform_key}")
@@ -176,20 +176,18 @@ def stitching_task(
 
     # Starting from on-disk full-resolution data, build and write to disk a
     # pyramid of coarser levels
-    # How to determine number of levels and coarsening factors?
-    # `build_pyramid`` fails with certain combinations of shape and num_levels
-    output_num_levels = 4
     build_pyramid(
         zarrurl=output_zarr_url,
         overwrite=True,
-        num_levels=output_num_levels,
+        num_levels=ngff_image_meta.num_levels,
         coarsening_xy=ngff_image_meta.coarsening_xy,
     )
 
     # attach metadata to the fused image
     store = parse_url(output_zarr_url, mode="w").store
     output_group = zarr.group(store=store)
-    # FIXME: Add Omero metadata
+    # FIXME: This way of writing Omero metadata currently drops Fractal 
+    # wavelength_id entry in omero channels
     writer.write_multiscales_metadata(
         group=output_group,
         axes=ngff_image_meta.axes_names,
@@ -205,8 +203,9 @@ def stitching_task(
                     for coordinateTransformation in fractal_ds.coordinateTransformations
                     ]
             }
-            for fractal_ds in ngff_image_meta.multiscales[0].datasets[:output_num_levels]
-        ]
+            for fractal_ds in ngff_image_meta.multiscales[0].datasets[:ngff_image_meta.num_levels]
+        ],
+        metadata=dict(omero = dict(channels = [channel.dict() for channel in ngff_image_meta.omero.channels]))
     )
 
     logger.info(f"Finished building resolution pyramid")
