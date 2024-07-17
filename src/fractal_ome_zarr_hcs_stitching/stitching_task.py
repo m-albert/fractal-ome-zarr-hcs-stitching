@@ -20,8 +20,10 @@ import anndata as ad
 from pydantic.v1.decorator import validate_arguments
 
 from fractal_tasks_core.ngff import load_NgffImageMeta
-from fractal_tasks_core.pyramids import build_pyramid
 from fractal_tasks_core.ngff.zarr_utils import ZarrGroupNotFoundError
+from fractal_tasks_core.pyramids import build_pyramid
+from fractal_tasks_core.roi import get_single_image_ROI
+from fractal_tasks_core.tables import write_table
 
 from fractal_ome_zarr_hcs_stitching.utils import (
     get_sim_from_multiscales,
@@ -168,8 +170,6 @@ def stitching_task(
     # rechunk the fused array to match the original array
     fused_da = fused_da.rechunk(xim_well.data.chunksize)
 
-    # FIXME: Move output_zarr_url to well level
-    # Use `_update_well_metadata` to update well metadata
     well_url, old_img_path = _split_well_path_image_path(zarr_url)
     output_zarr_url = f"{well_url}/{zarr_url.split('/')[-1]}_{output_group_suffix}"
     logger.info(f"Output fused path: {output_zarr_url}")
@@ -227,6 +227,18 @@ def stitching_task(
 
     logger.info(f"Finished building resolution pyramid")
 
+    # Add ROI table to the image
+    ngff_image_meta.get_pixel_sizes_zyx(level=0)
+    pixels_ZYX = ngff_image_meta.multiscales[0].datasets[0].coordinateTransformations[0].scale[-3:]
+    image_ROI_table = get_single_image_ROI(fused_da.shape, pixels_ZYX=pixels_ZYX)
+    write_table(
+        output_group,
+        "well_ROI_table", # Could also be image_ROI_table
+        image_ROI_table,
+        overwrite=True,
+        table_attrs={"type": "roi_table"},
+    )
+
     ####################
     # Clean up Zarr file
     ####################
@@ -243,7 +255,6 @@ def stitching_task(
         )
         # Update the metadata of the the well
         well_url, new_img_path = _split_well_path_image_path(output_zarr_url)
-        # FIXME: Check for well existence
         try:
             _update_well_metadata(
                 well_url=well_url,
