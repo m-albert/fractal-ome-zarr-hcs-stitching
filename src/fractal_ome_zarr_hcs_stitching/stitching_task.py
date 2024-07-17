@@ -21,6 +21,7 @@ from pydantic.v1.decorator import validate_arguments
 
 from fractal_tasks_core.ngff import load_NgffImageMeta
 from fractal_tasks_core.pyramids import build_pyramid
+from fractal_tasks_core.ngff.zarr_utils import ZarrGroupNotFoundError
 
 from fractal_ome_zarr_hcs_stitching.utils import (
     get_sim_from_multiscales,
@@ -242,11 +243,18 @@ def stitching_task(
         )
         # Update the metadata of the the well
         well_url, new_img_path = _split_well_path_image_path(output_zarr_url)
-        _update_well_metadata(
-            well_url=well_url,
-            old_image_path=old_img_path,
-            new_image_path=new_img_path,
-        )
+        # FIXME: Check for well existence
+        try:
+            _update_well_metadata(
+                well_url=well_url,
+                old_image_path=old_img_path,
+                new_image_path=new_img_path,
+            )
+        except ZarrGroupNotFoundError:
+            logger.debug(
+                f"{zarr_url} is not in an HCS plate. No well metadata got updated"
+            )
+
         return image_list_updates
 
     logger.info(f"Done stitching")
