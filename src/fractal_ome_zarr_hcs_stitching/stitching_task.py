@@ -203,8 +203,6 @@ def stitching_task(
     # attach metadata to the fused image
     store = parse_url(output_zarr_url, mode="w").store
     output_group = zarr.group(store=store)
-    # FIXME: This way of writing Omero metadata currently drops Fractal 
-    # wavelength_id entry in omero channels
     writer.write_multiscales_metadata(
         group=output_group,
         axes=ngff_image_meta.axes_names,
@@ -224,6 +222,8 @@ def stitching_task(
         ],
         metadata=dict(omero = dict(channels = [channel.dict() for channel in ngff_image_meta.omero.channels]))
     )
+    # FIXME: This way of writing Omero metadata currently drops Fractal 
+    # wavelength_id entry in omero channels
 
     logger.info(f"Finished building resolution pyramid")
 
@@ -264,6 +264,11 @@ def stitching_task(
         except ZarrGroupNotFoundError:
             logger.debug(
                 f"{zarr_url} is not in an HCS plate. No well metadata got updated"
+            )
+        except ValueError:
+            logger.debug(
+                f"Could not update well metadata, likely because "
+                f" {output_zarr_url} was already listed there."
             )
 
         return image_list_updates
