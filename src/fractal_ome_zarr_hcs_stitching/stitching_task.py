@@ -188,15 +188,13 @@ def stitching_task(
 
     # Starting from on-disk full-resolution data, build and write to disk a
     # pyramid of coarser levels
-    # How to determine number of levels and coarsening factors?
-    # `build_pyramid`` fails with certain combinations of shape and num_levels
-    # Original levels are stored in ngff_image_meta.num_levels. But 5 levels 
-    # fails on test data
-    output_num_levels = 4
+    # Provide original chunksize to avoid "ValueError: Attempt to save array 
+    # to zarr with irregular chunking, please call `arr.rechunk(...)` first."
     build_pyramid(
         zarrurl=output_zarr_url,
         overwrite=True,
-        num_levels=output_num_levels,
+        num_levels=ngff_image_meta.num_levels,
+        chunksize=xim_well.data.chunksize,
         coarsening_xy=ngff_image_meta.coarsening_xy,
     )
 
@@ -218,7 +216,7 @@ def stitching_task(
                     for coordinateTransformation in fractal_ds.coordinateTransformations
                     ]
             }
-            for fractal_ds in ngff_image_meta.multiscales[0].datasets[:output_num_levels]
+            for fractal_ds in ngff_image_meta.multiscales[0].datasets[:ngff_image_meta.num_levels]
         ],
         metadata=dict(omero = dict(channels = [channel.dict() for channel in ngff_image_meta.omero.channels]))
     )
