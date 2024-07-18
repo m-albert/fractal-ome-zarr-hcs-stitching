@@ -222,8 +222,10 @@ def stitching_task(
         ],
         metadata=dict(omero = dict(channels = [channel.dict() for channel in ngff_image_meta.omero.channels]))
     )
-    # FIXME: This way of writing Omero metadata currently drops Fractal 
-    # wavelength_id entry in omero channels
+    # Workaround: Manually add wavelength_id attr back to omero channel
+    original_omero_attrs = zarr.open(zarr_url).attrs["omero"]["channels"]
+    for i, omero_channel in enumerate(output_group.attrs["omero"]["channels"]):
+        omero_channel["wavelength_id"] = original_omero_attrs[i]["wavelength_id"]
 
     logger.info(f"Finished building resolution pyramid")
 
