@@ -1,3 +1,5 @@
+"""Contains the list of tasks available to fractal."""
+
 from fractal_tasks_core.dev.task_models import ParallelTask
 
 TASK_LIST = [
