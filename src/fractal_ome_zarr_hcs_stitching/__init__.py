@@ -1,6 +1,5 @@
-"""
-Fractal task(s) for registering and fusing OME-Zarr HCS
-"""
+"""Fractal task(s) for registering and fusing OME-Zarr HCS"""
+
 from importlib.metadata import PackageNotFoundError, version
 
 try:

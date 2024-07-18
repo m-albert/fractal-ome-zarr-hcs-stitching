@@ -1,7 +1,7 @@
-import fractal_ome_zarr_hcs_stitching
 import json
 from pathlib import Path
 
+import fractal_ome_zarr_hcs_stitching
 
 PACKAGE = "fractal_ome_zarr_hcs_stitching"
 PACKAGE_DIR = Path(fractal_ome_zarr_hcs_stitching.__file__).parent
