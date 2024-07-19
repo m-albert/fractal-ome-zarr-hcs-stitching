@@ -41,10 +41,12 @@ def test_data_dir(tmp_path: Path) -> str:
 
 
 @pytest.mark.parametrize(
-    "registration_resolution_level",
-    [0, 1],
+    "registration_resolution_level, registration_on_z_proj",
+    [[res_level, z_proj] for res_level in [0, 1] for z_proj in [True, False]],
 )
-def test_stitching_task(registration_resolution_level, test_data_dir):
+def test_stitching_task(
+    test_data_dir, registration_resolution_level, registration_on_z_proj
+):
     stitching_task(
         zarr_url=test_data_dir,
         registration_channel_label="DAPI",
