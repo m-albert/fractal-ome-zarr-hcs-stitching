@@ -205,7 +205,7 @@ def stitching_task(
         fused = fused.expand_dims("z", xim_well.dims.index("z"))
 
     # get the dask array from the fused sim
-    fused_da = fused.data
+    fused_da = fused.sel({"c": fused.coords["c"].values}).data
 
     # rechunk the fused array to match the original array
     fused_da = fused_da.rechunk(xim_well.data.chunksize)
