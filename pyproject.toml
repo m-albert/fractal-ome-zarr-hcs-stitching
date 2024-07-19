@@ -1,7 +1,28 @@
+# https://peps.python.org/pep-0517/
+[build-system]
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+# https://hatch.pypa.io/latest/config/metadata/
+[tool.hatch.version]
+#path = "src/fractal_ome_zarr_hcs_stitching/__init__.py"
+source = "vcs"
+
+# read more about configuring hatch at:
+# https://hatch.pypa.io/latest/config/build/
+[tool.hatch.build.targets.wheel]
+only-include = ["src"]
+sources = ["src"]
+
+# Always include the __FRACTAL_MANIFEST__.json file in the package
+[tool.hatch.build]
+include = ["__FRACTAL_MANIFEST__.json"]
+
+
 # Project metadata (see https://peps.python.org/pep-0621)
 [project]
 name = "fractal-ome-zarr-hcs-stitching"
-version = "0.0.1"
+dynamic = ["version"]
 description = "Fractal task(s) for registering and fusing OME-Zarr HCS"
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
@@ -10,9 +31,9 @@ authors = [
 ]
 
 # Required Python version and dependencies
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dependencies = [
-    "fractal-tasks-core == 1.0.0a1",
+    "fractal-tasks-core == 1.1.0",
     "multiview-stitcher == 0.1.7",
     "anndata",
     "ome-zarr",
@@ -22,17 +43,45 @@ dependencies = [
 # Optional dependencies (e.g. for `pip install -e ".[dev]"`, see
 # https://peps.python.org/pep-0621/#dependencies-optional-dependencies)
 [project.optional-dependencies]
-dev = ["devtools", "pytest", "requests", "build", "jsonschema"]
+dev = ["devtools", "hatch", "pytest", "requests", "jsonschema", "ruff", "pre-commit"]
 
-# Build options (see https://peps.python.org/pep-0517)
-[build-system]
-requires = ["setuptools"]
-build-backend = "setuptools.build_meta"
+# https://docs.astral.sh/ruff
+[tool.ruff]
+line-length = 88
+target-version = "py39"
+src = ["src"]
 
-[tool.setuptools.packages.find]
-where = ["src"]
-include = ["fractal_ome_zarr_hcs_stitching"]
+# https://docs.astral.sh/ruff/rules
+[tool.ruff.lint]
+pydocstyle = { convention = "google" }
+select = [
+    "E",    # style errors
+    "W",    # style warnings
+    "F",    # flakes
+    "D",    # pydocstyle
+    "D417", # Missing argument descriptions in Docstrings
+    "I",    # isort
+    "UP",   # pyupgrade
+    "C4",   # flake8-comprehensions
+    "B",    # flake8-bugbear
+    "A001", # flake8-builtins
+    "RUF",  # ruff-specific rules
+    "TCH",  # flake8-type-checking
+    "TID",  # flake8-tidy-imports
+]
+ignore = [
+    "C408", # Unnecessary `dict` call (rewrite as a literal)
+    "C416", # Unnecessary `dict` comprehension (rewrite using `dict()`)
+    "D401", # First line should be in imperative mood (remove to opt in)
+    "D415", # First line should end with a period (remove to opt in)
+    "D205", # 1 blank line required between summary line and description
+]
 
-# Always include the __FRACTAL_MANIFEST__.json file in the package
-[tool.setuptools.package-data]
-"*" = ["__FRACTAL_MANIFEST__.json"]
+[tool.ruff.lint.per-file-ignores]
+"tests/*.py" = ["D", "S"]
+
+# https://docs.astral.sh/ruff/formatter/
+[tool.ruff.format]
+docstring-code-format = true
+docstring-code-line-length = 89
+skip-magic-trailing-comma = false  # default is false

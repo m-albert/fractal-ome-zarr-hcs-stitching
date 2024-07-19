@@ -6,8 +6,7 @@ from subprocess import PIPE
 import pytest
 from devtools import debug
 
-from . import MANIFEST
-from . import PACKAGE_DIR
+from . import MANIFEST, PACKAGE_DIR
 
 
 def validate_command(cmd: str):
@@ -15,7 +14,7 @@ def validate_command(cmd: str):
     Run a command and make assertions on stdout, stderr, retcode.
     """
     debug(cmd)
-    result = subprocess.run(  # nosec
+    result = subprocess.run(  # nosec #noqa #UP022
         shlex_split(cmd),
         stdout=PIPE,
         stderr=PIPE,
@@ -28,7 +27,7 @@ def validate_command(cmd: str):
 
     # Valid stderr includes pydantic.error_wrappers.ValidationError (type
     # match between model and function, but tmp_file_args has wrong arguments)
-    assert "pydantic.error_wrappers.ValidationError" in stderr
+    assert "pydantic.v1.error_wrappers.ValidationError" in stderr
 
     # Valid stderr must include a mention of "unexpected keyword arguments",
     # because we are including some invalid arguments
