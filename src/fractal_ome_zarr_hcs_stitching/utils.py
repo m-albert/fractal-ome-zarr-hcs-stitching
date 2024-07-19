@@ -54,6 +54,7 @@ def get_sim_from_multiscales(
 def get_tiles_from_sim(
     xim_well,
     fov_roi_table: pd.DataFrame,
+    transform_key: str = "fractal_input",
 ):
     """_summary_
 
@@ -78,9 +79,6 @@ def get_tiles_from_sim(
             dim: row[f"{dim}_micrometer_original"] if dim != "z" else 0
             for dim in input_spatial_dims
         }
-        # extent_original = {
-        #     dim: row[f"len_{dim}_micrometer"] for dim in input_spatial_dims
-        # }
 
         tile = xim_well.sel(
             {
@@ -91,15 +89,13 @@ def get_tiles_from_sim(
 
         tile = tile.squeeze(drop=True)
 
-        # tile_spatial_dims = [dim for dim in tile.dims if dim in ["z", "y", "x"]]
-
         sim = si_utils.get_sim_from_array(
             tile.data,
             dims=tile.dims,
             c_coords=xim_well.coords["c"].data,
             scale=si_utils.get_spacing_from_sim(tile),
             translation=origin_original,
-            transform_key="fractal_original",
+            transform_key=transform_key,
         )
 
         msim = msi_utils.get_msim_from_sim(sim, scale_factors=[])

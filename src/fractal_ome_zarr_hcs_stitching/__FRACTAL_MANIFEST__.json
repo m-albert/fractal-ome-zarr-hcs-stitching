@@ -46,6 +46,12 @@
             "default": 0,
             "type": "integer",
             "description": "Resolution level to use for registration."
+          },
+          "registration_on_z_proj": {
+            "title": "Registration On Z Proj",
+            "default": false,
+            "type": "boolean",
+            "description": "Whether to perform registration on maximum projection along z in case of 3D input data."
           }
         },
         "required": [
