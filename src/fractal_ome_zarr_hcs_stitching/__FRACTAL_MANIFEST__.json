@@ -41,17 +41,11 @@
             "type": "string",
             "description": "Suffix of the new OME-Zarr image to write the fused image to."
           },
-          "registration_binning_xy": {
-            "title": "Registration Binning Xy",
-            "default": 1,
+          "registration_resolution_level": {
+            "title": "Registration Resolution Level",
+            "default": 0,
             "type": "integer",
-            "description": "Binning factor for XY axes during registration."
-          },
-          "registration_binning_z": {
-            "title": "Registration Binning Z",
-            "default": 1,
-            "type": "integer",
-            "description": "Binning factor for Z axis during registration (if present)."
+            "description": "Resolution level to use for registration."
           }
         },
         "required": [
