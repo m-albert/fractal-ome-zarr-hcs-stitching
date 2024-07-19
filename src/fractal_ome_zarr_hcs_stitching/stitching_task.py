@@ -39,8 +39,7 @@ def stitching_task(
     registration_channel_label: str = "DAPI",
     overwrite_input: bool = False,
     output_group_suffix: str = "fused",
-    registration_binning_xy: int = 1,
-    registration_binning_z: int = 1,
+    registration_resolution_level: int = 0,
 ) -> None:
     """Stitches FOVs from an OME-Zarr image.
 
@@ -62,9 +61,7 @@ def stitching_task(
             with the output of this task.
         output_group_suffix: Suffix of the new OME-Zarr image to write the
             fused image to.
-        registration_binning_xy: Binning factor for XY axes during registration.
-        registration_binning_z: Binning factor for Z axis during registration
-            (if present).
+        registration_resolution_level: Resolution level to use for registration.
     """
     # Use the first of input_paths
     logging.info(f"{zarr_url=}")
@@ -85,49 +82,39 @@ def stitching_task(
         f"{ngff_image_meta.get_pixel_sizes_zyx(level=1)}"
     )
 
-    # Load FOVs for registration
-    xim_well = get_sim_from_multiscales(
-        Path(zarr_url), 0
-    )  # could also be lower resolution
-    fov_roi_table = ad.read_zarr(Path(zarr_url) / "tables/FOV_ROI_table").to_df()
-    msims = get_tiles_from_sim(xim_well, fov_roi_table)
-
-    reg_spatial_dims = [
-        dim
-        for dim in msi_utils.get_sim_from_msim(msims[0]).dims
-        if dim in ["z", "y", "x"]
-    ]
-
     #############
     # Registration
     ##############
 
+    # Load FOVs for registration
+    xim_well_reg = get_sim_from_multiscales(
+        Path(zarr_url), resolution=registration_resolution_level
+    )  # could also be lower resolution
+    fov_roi_table = ad.read_zarr(Path(zarr_url) / "tables/FOV_ROI_table").to_df()
+    msims_reg = get_tiles_from_sim(xim_well_reg, fov_roi_table)
+
+    reg_spatial_dims = [
+        dim
+        for dim in msi_utils.get_sim_from_msim(msims_reg[0]).dims
+        if dim in ["z", "y", "x"]
+    ]
+
     logger.info("Started registration")
     logger.info(f"Registration channel: {registration_channel_label}")
-    logger.info(f"Registration binning XY: {registration_binning_xy}")
-    logger.info(f"Registration binning Z: {registration_binning_z}")
+    logger.info(f"Registration res level: {registration_resolution_level}")
     logger.info(f"Registration spatial dims: {reg_spatial_dims}")
 
     reg_channel_index = (
-        xim_well.coords["c"].data.tolist().index(registration_channel_label)
+        xim_well_reg.coords["c"].data.tolist().index(registration_channel_label)
     )
     try:
         fusion_transform_key = "translation_registered"
         params = registration.register(
-            msims[:],
+            msims_reg,
             transform_key="fractal_original",
-            reg_channel_index=reg_channel_index,
             new_transform_key=fusion_transform_key,
-            registration_binning={
-                "y": registration_binning_xy,
-                "x": registration_binning_xy,
-            }
-            if "z" not in msi_utils.get_sim_from_msim(msims[0]).dims
-            else {
-                "z": registration_binning_z,
-                "y": registration_binning_xy,
-                "x": registration_binning_xy,
-            },
+            reg_channel_index=reg_channel_index,
+            registration_binning={dim: 1 for dim in reg_spatial_dims},
         )
     except NotEnoughOverlapError:
         logger.warning("Not enough overlap for stitching.")
@@ -151,12 +138,29 @@ def stitching_task(
     # Fusion
     ########
 
+    if registration_resolution_level == 0:
+        xim_well = xim_well_reg
+        msims_fusion = msims_reg
+    else:
+        # Load the full-resolution image for fusion
+        xim_well = get_sim_from_multiscales(Path(zarr_url), resolution=0)
+        msims_fusion = get_tiles_from_sim(xim_well, fov_roi_table)
+
+    # assign the registration parameters to the tiles to be fused
+    for itile in range(len(msims_fusion)):
+        affine = msi_utils.get_transform_from_msim(
+            msims_reg[itile], fusion_transform_key
+        )
+        msi_utils.set_affine_transform(
+            msims_fusion[itile], affine, fusion_transform_key
+        )
+
     # FIXME: Something in the fusion changes channel index order. Unclear what
-    sims = [msi_utils.get_sim_from_msim(msim) for msim in msims]
+    sims = [msi_utils.get_sim_from_msim(msim) for msim in msims_fusion]
 
     logger.info(f"Started fusion using transform key {fusion_transform_key}")
     fused = fusion.fuse(
-        sims[:],
+        sims,
         transform_key=fusion_transform_key,
         output_chunksize=xim_well.data.chunksize[-1],
         output_spacing=si_utils.get_spacing_from_sim(sims[0]),

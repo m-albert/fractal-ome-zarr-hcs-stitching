@@ -40,10 +40,13 @@ def test_data_dir(tmp_path: Path) -> str:
     return dest_dir
 
 
-def test_stitching_task(test_data_dir):
+@pytest.mark.parametrize(
+    "registration_resolution_level",
+    [0, 1],
+)
+def test_stitching_task(registration_resolution_level, test_data_dir):
     stitching_task(
         zarr_url=test_data_dir,
         registration_channel_label="DAPI",
-        registration_binning_xy=1,
-        registration_binning_z=1,
+        registration_resolution_level=registration_resolution_level,
     )
