@@ -106,8 +106,6 @@ def stitching_task(
 
     if reg_max_project_z:
         xim_well_reg = xim_well_reg.max("z")
-    else:
-        xim_well_reg = xim_well_reg
 
     msims_reg = get_tiles_from_sim(
         xim_well_reg, fov_roi_table, transform_key=input_transform_key
@@ -187,7 +185,6 @@ def stitching_task(
             msims_fusion[itile], affine, fusion_transform_key
         )
 
-    # FIXME: Something in the fusion changes channel index order. Unclear what
     sims = [msi_utils.get_sim_from_msim(msim) for msim in msims_fusion]
 
     logger.info(f"Started fusion using transform key {fusion_transform_key}")
