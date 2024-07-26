@@ -1,0 +1,125 @@
+name: CI (pip)
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+
+jobs:
+
+  tests:
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, macos-latest]
+        python-version: ["3.9", "3.10", "3.11"]
+        exclude:
+          - os: macos-latest
+            python-version: '3.9'
+          - os: macos-latest
+            python-version: '3.10'
+    name: "Core, Python ${{ matrix.python-version }}, ${{ matrix.os }}"
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+
+      - name: Install package & testing extras
+        run: python -m pip install -e ".[dev]"
+
+      - name: Cache Pooch folder
+        id: cache-pooch-folder
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pooch
+          key: pooch-cache
+
+      - name: Run tests with coverage
+        run: |
+          coverage run -m pytest tests -s --log-cli-level info
+
+      # - name: Generate coverage report
+      #   run: |
+      #     coverage report
+      #     coverage xml
+
+      - name: Upload coverage data
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-data
+          path: ".coverage*"
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-22.04
+    env:
+      COVERAGE_FILE: ./.coverage
+    needs: [tests]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install dependencies
+        run: python -m pip install --upgrade coverage[toml]
+
+      - name: Download data
+        uses: actions/download-artifact@v3
+        with:
+          name: coverage-data
+
+      - name: List coverage files
+        run: find . -name ".coverage*"
+
+      # Run coverage generation again
+      # - name: Install dependencies
+      #   run: |
+      #     python -m pip install --upgrade pip
+      #     pip install ".[dev]"
+      #     pip install coverage
+    
+      # - name: Run tests and generate coverage report
+      #   run: |
+      #     coverage run -m pytest tests
+      #     coverage xml
+      #     coverage html
+
+      # - name: List coverage files
+      #   run: find . -name ".coverage*"
+      - name: Combine coverage data
+        env:
+          COVERAGE_FILE: ./.coverage
+        run: |
+          set -x  # Enable debug mode
+          coverage combine || true  # Combine coverage files, ignore errors for debugging
+          coverage report
+          set +x  # Disable debug mode
+
+      - name: Add coverage comment to Pull Requests
+        id: coverage_comment
+        uses: py-cov-action/python-coverage-comment-action@v3
+        with:
+          GITHUB_TOKEN: ${{ github.token }}
+          MERGE_COVERAGE_FILES: true
+          MINIMUM_GREEN: 90
+          MINIMUM_ORANGE: 60
+          ANNOTATE_MISSING_LINES: true
+          ANNOTATION_TYPE: notice
+        env:
+          COVERAGE_FILE: ./.coverage

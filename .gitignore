@@ -5,3 +5,6 @@ tests/__pycache__
 tests/data/*
 .DS_Store
 __pycache__/
+.coverage
+dist/
+_playground/run_example.py
