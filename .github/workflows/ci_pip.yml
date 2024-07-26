@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: ["main"]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 
 jobs:
 
@@ -77,6 +81,9 @@ jobs:
         uses: actions/download-artifact@v3
         with:
           name: coverage-data
+
+      - name: List coverage files
+        run: ls -R .
 
       - name: Add coverage comment to Pull Requests
         id: coverage_comment
