@@ -1,11 +1,17 @@
 # .github/workflows/coverage.yml
 name: Post coverage comment
 
+# on:
+#   workflow_run:
+#     workflows: ["CI"]
+#     types:
+#       - completed
+
 on:
-  workflow_run:
-    workflows: ["CI"]
-    types:
-      - completed
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
 
 jobs:
   test:
