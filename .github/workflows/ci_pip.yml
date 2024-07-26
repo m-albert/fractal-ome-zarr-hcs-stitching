@@ -66,6 +66,8 @@ jobs:
   coverage:
     name: Coverage
     runs-on: ubuntu-22.04
+    env:
+      COVERAGE_FILE: ./.coverage
     needs: [tests]
     steps:
       - uses: actions/checkout@v4
