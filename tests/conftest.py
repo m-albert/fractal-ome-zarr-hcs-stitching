@@ -87,7 +87,6 @@ def zenodo_search_first_ome_zarr(testdata_path: Path) -> str:
         f"{file_name}.zip", processor=pooch.Unzip(extract_dir=file_name)
     )
     zarr_full_path = file_paths[0].split(file_name)[0] + file_name
-    print(zarr_full_path)
 
     # 2) Copy the downloaded Zarr into tests/data
     if os.path.isdir(str(rootfolder)):
@@ -96,21 +95,45 @@ def zenodo_search_first_ome_zarr(testdata_path: Path) -> str:
     return rootfolder
 
 
-@pytest.fixture(scope="session")
-def tiled_ome_zarr_2d(zenodo_tiled_ome_zarr) -> str:
-    return f"{zenodo_tiled_ome_zarr}/231129NAR_mip.zarr/B/02/0"
+@pytest.fixture(scope="function")
+def tiled_ome_zarr_2d(tmpdir, zenodo_tiled_ome_zarr) -> str:
+    plate_name = "231129NAR_mip.zarr"
+    zarr_plate_path = f"{zenodo_tiled_ome_zarr}/{plate_name}"
+    target_dir = tmpdir / plate_name
+    if os.path.isdir(str(target_dir)):
+        shutil.rmtree(str(target_dir))
+    shutil.copytree(zarr_plate_path, target_dir)
+    return f"{target_dir}/B/02/0"
 
 
-@pytest.fixture(scope="session")
-def tiled_ome_zarr_3d(zenodo_tiled_ome_zarr) -> str:
-    return f"{zenodo_tiled_ome_zarr}/231129NAR.zarr/B/02/0"
+@pytest.fixture(scope="function")
+def tiled_ome_zarr_3d(tmpdir, zenodo_tiled_ome_zarr) -> str:
+    plate_name = "231129NAR.zarr"
+    zarr_plate_path = f"{zenodo_tiled_ome_zarr}/{plate_name}"
+    target_dir = tmpdir / plate_name
+    if os.path.isdir(str(target_dir)):
+        shutil.rmtree(str(target_dir))
+    shutil.copytree(zarr_plate_path, target_dir)
+    return f"{target_dir}/B/02/0"
 
 
-@pytest.fixture(scope="session")
-def search_first_ome_zarr_2d(zenodo_search_first_ome_zarr) -> str:
-    return f"{zenodo_search_first_ome_zarr}/dcflexr1_mip.zarr/C/05/0"
+@pytest.fixture(scope="function")
+def search_first_ome_zarr_2d(tmpdir, zenodo_search_first_ome_zarr) -> str:
+    plate_name = "dcflexr1_mip.zarr"
+    zarr_plate_path = f"{zenodo_search_first_ome_zarr}/{plate_name}"
+    target_dir = tmpdir / plate_name
+    if os.path.isdir(str(target_dir)):
+        shutil.rmtree(str(target_dir))
+    shutil.copytree(Path(zarr_plate_path), target_dir)
+    return f"{target_dir}/C/05/0"
 
 
-@pytest.fixture(scope="session")
-def search_first_ome_zarr_3d(zenodo_search_first_ome_zarr) -> str:
-    return f"{zenodo_search_first_ome_zarr}/dcflexr1.zarr/C/05/0"
+@pytest.fixture(scope="function")
+def search_first_ome_zarr_3d(tmpdir, zenodo_search_first_ome_zarr) -> str:
+    plate_name = "dcflexr1.zarr"
+    zarr_plate_path = f"{zenodo_search_first_ome_zarr}/{plate_name}"
+    target_dir = tmpdir / plate_name
+    if os.path.isdir(str(target_dir)):
+        shutil.rmtree(str(target_dir))
+    shutil.copytree(Path(zarr_plate_path), target_dir)
+    return f"{target_dir}/C/05/0"
