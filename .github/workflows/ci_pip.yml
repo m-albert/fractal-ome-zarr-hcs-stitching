@@ -88,20 +88,28 @@ jobs:
         run: find . -name ".coverage*"
 
       # Run coverage generation again
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install ".[dev]"
-          pip install coverage
+      # - name: Install dependencies
+      #   run: |
+      #     python -m pip install --upgrade pip
+      #     pip install ".[dev]"
+      #     pip install coverage
     
-      - name: Run tests and generate coverage report
-        run: |
-          coverage run -m pytest tests
-          coverage xml
-          coverage html
+      # - name: Run tests and generate coverage report
+      #   run: |
+      #     coverage run -m pytest tests
+      #     coverage xml
+      #     coverage html
 
-      - name: List coverage files
-        run: find . -name ".coverage*"
+      # - name: List coverage files
+      #   run: find . -name ".coverage*"
+      - name: Combine coverage data
+        env:
+          COVERAGE_FILE: ./.coverage
+        run: |
+          set -x  # Enable debug mode
+          coverage combine || true  # Combine coverage files, ignore errors for debugging
+          coverage report
+          set +x  # Disable debug mode
 
       - name: Add coverage comment to Pull Requests
         id: coverage_comment
@@ -113,3 +121,5 @@ jobs:
           MINIMUM_ORANGE: 60
           ANNOTATE_MISSING_LINES: true
           ANNOTATION_TYPE: notice
+        env:
+          COVERAGE_FILE: ./.coverage
