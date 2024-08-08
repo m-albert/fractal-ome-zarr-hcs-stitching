@@ -85,3 +85,14 @@ ignore = [
 docstring-code-format = true
 docstring-code-line-length = 89
 skip-magic-trailing-comma = false  # default is false
+
+[tool.coverage.run]
+relative_files = true
+source = [
+    "src/fractal_ome_zarr_hcs_stitching"
+]
+
+[tool.coverage.report]
+omit = [
+    "tests/*"
+]
