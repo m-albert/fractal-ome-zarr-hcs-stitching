@@ -196,12 +196,21 @@ def stitching_task(
         )
 
     sims = [msi_utils.get_sim_from_msim(msim) for msim in msims_fusion]
+    sdims = si_utils.get_spatial_dims_from_sim(xim_well)
+    ndim = len(sdims)
 
     logger.info(f"Started fusion using transform key {fusion_transform_key}")
+
+    output_chunksize = {
+        dim: xim_well.data.chunksize[(-ndim + idim)] for idim, dim in enumerate(sdims)
+    }
+    logger.info(f"Output chunksize: {output_chunksize}")
+    logging.info("Started building fusion graph")
+
     fused = fusion.fuse(
         sims,
         transform_key=fusion_transform_key,
-        output_chunksize=xim_well.data.chunksize[-1],
+        output_chunksize=output_chunksize,
         output_spacing=si_utils.get_spacing_from_sim(sims[0]),
         # fusion_func=fusion.max_fusion,
     )
@@ -214,13 +223,13 @@ def stitching_task(
     # get the dask array from the fused sim
     fused_da = fused.sel({"c": fused.coords["c"].values}).data
 
-    # rechunk the fused array to match the original array
-    fused_da = fused_da.rechunk(xim_well.data.chunksize)
+    logging.info("Finished building fusion graph")
 
     well_url, old_img_path = _split_well_path_image_path(zarr_url)
     output_zarr_url = f"{well_url}/{zarr_url.split('/')[-1]}_{output_group_suffix}"
     logger.info(f"Output fused path: {output_zarr_url}")
 
+    logging.info("Starting fusion computation")
     # Write the fused array back to the same full-resolution Zarr array
     fused_da = fused_da.to_zarr(
         f"{output_zarr_url}/0",
@@ -230,8 +239,7 @@ def stitching_task(
         compute=True,
     )
 
-    logger.info("Finished fusion")
-
+    logger.info("Finished fusion computation")
     logger.info("Started building resolution pyramid")
 
     # Starting from on-disk full-resolution data, build and write to disk a
