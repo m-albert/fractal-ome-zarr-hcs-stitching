@@ -22,7 +22,7 @@ from multiview_stitcher import spatial_image_utils as si_utils
 from multiview_stitcher.mv_graph import NotEnoughOverlapError
 from ome_zarr import writer
 from ome_zarr.io import parse_url
-from pydantic.v1.decorator import validate_arguments
+from pydantic import validate_call
 
 from fractal_ome_zarr_hcs_stitching.utils import (
     get_sim_from_multiscales,
@@ -32,7 +32,7 @@ from fractal_ome_zarr_hcs_stitching.utils import (
 logger = logging.getLogger(__name__)
 
 
-@validate_arguments
+@validate_call
 def stitching_task(
     *,
     zarr_url: str,

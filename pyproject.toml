@@ -33,7 +33,7 @@ authors = [
 # Required Python version and dependencies
 requires-python = ">=3.9"
 dependencies = [
-    "fractal-tasks-core == 1.1.0",
+    "fractal-tasks-core == 1.2.1",
     "multiview-stitcher == 0.1.10",
     "anndata",
     "ome-zarr",
