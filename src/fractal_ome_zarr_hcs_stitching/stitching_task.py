@@ -22,21 +22,21 @@ from multiview_stitcher import spatial_image_utils as si_utils
 from multiview_stitcher.mv_graph import NotEnoughOverlapError
 from ome_zarr import writer
 from ome_zarr.io import parse_url
-from pydantic.v1.decorator import validate_arguments
+from pydantic import validate_call
 
 from fractal_ome_zarr_hcs_stitching.utils import (
     get_sim_from_multiscales,
-    get_tiles_from_sim,
+    get_tiles_from_sim, StitchingChannelInputModel,
 )
 
 logger = logging.getLogger(__name__)
 
 
-@validate_arguments
+@validate_call
 def stitching_task(
     *,
     zarr_url: str,
-    registration_channel_label: str = "DAPI",
+    channel: StitchingChannelInputModel,
     overwrite_input: bool = False,
     output_group_suffix: str = "fused",
     registration_resolution_level: int = 0,
@@ -57,7 +57,9 @@ def stitching_task(
 
     Args:
         zarr_url: Absolute path to the OME-Zarr image.
-        registration_channel_label: Label of the channel to use for registration.
+        channel: Channel for registration; requires either
+            `wavelength_id` (e.g. `A01_C01`) or `label` (e.g. `DAPI`), but not
+            both.
         overwrite_input: Whether to override the original, not stitched image
             with the output of this task.
         output_group_suffix: Suffix of the new OME-Zarr image to write the
@@ -116,13 +118,17 @@ def stitching_task(
     )
 
     logger.info("Started registration")
-    logger.info(f"Registration channel: {registration_channel_label}")
     logger.info(f"Registration res level: {registration_resolution_level}")
     logger.info(f"Registration spatial dims: {reg_spatial_dims}")
 
-    reg_channel_index = (
-        xim_well_reg.coords["c"].data.tolist().index(registration_channel_label)
-    )
+    # Find channel index
+    omero_channel = channel.get_omero_channel(zarr_url)
+    if omero_channel:
+        reg_channel_index = omero_channel.index
+    else:
+        logger.info(f"Skipping stitching for {zarr_url} because {channel} is not available in that OME-Zarr image")
+        return
+
     try:
         fusion_transform_key = "translation_registered"
         params = registration.register(

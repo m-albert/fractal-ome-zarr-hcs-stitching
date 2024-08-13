@@ -15,53 +15,72 @@
         "mem": 4000
       },
       "args_schema_parallel": {
-        "title": "StitchingTask",
-        "type": "object",
+        "$defs": {
+          "StitchingChannelInputModel": {
+            "description": "Channel input for stitching.",
+            "properties": {
+              "wavelength_id": {
+                "title": "Wavelength Id",
+                "type": "string",
+                "description": "Unique ID for the channel wavelength, e.g. `A01_C01`. Can only be specified if label is not set."
+              },
+              "label": {
+                "title": "Label",
+                "type": "string",
+                "description": "Name of the channel. Can only be specified if wavelength_id is not set."
+              }
+            },
+            "title": "StitchingChannelInputModel",
+            "type": "object"
+          }
+        },
+        "additionalProperties": false,
         "properties": {
           "zarr_url": {
             "title": "Zarr Url",
             "type": "string",
             "description": "Absolute path to the OME-Zarr image."
           },
-          "registration_channel_label": {
-            "title": "Registration Channel Label",
-            "default": "DAPI",
-            "type": "string",
-            "description": "Label of the channel to use for registration."
+          "channel": {
+            "$ref": "#/$defs/StitchingChannelInputModel",
+            "title": "Channel",
+            "description": "Channel for registration; requires either `wavelength_id` (e.g. `A01_C01`) or `label` (e.g. `DAPI`), but not both."
           },
           "overwrite_input": {
-            "title": "Overwrite Input",
             "default": false,
+            "title": "Overwrite Input",
             "type": "boolean",
             "description": "Whether to override the original, not stitched image with the output of this task."
           },
           "output_group_suffix": {
-            "title": "Output Group Suffix",
             "default": "fused",
+            "title": "Output Group Suffix",
             "type": "string",
             "description": "Suffix of the new OME-Zarr image to write the fused image to."
           },
           "registration_resolution_level": {
-            "title": "Registration Resolution Level",
             "default": 0,
+            "title": "Registration Resolution Level",
             "type": "integer",
             "description": "Resolution level to use for registration."
           },
           "registration_on_z_proj": {
+            "default": true,
             "title": "Registration On Z Proj",
-            "default": false,
             "type": "boolean",
-            "description": "Whether to perform registration on maximum projection along z in case of 3D input data."
+            "description": "Whether to perform registration on a maximum projection along z in case of 3D data."
           }
         },
         "required": [
-          "zarr_url"
+          "zarr_url",
+          "channel"
         ],
-        "additionalProperties": false
+        "type": "object",
+        "title": "StitchingTask"
       },
-      "docs_info": "## stitching_task\nStitches FOVs from an OME-Zarr image.\n\nPerforms registration and fusion of FOVs indicated\nin the FOV_ROI_table of the OME-Zarr image. Writes the\nfused image back to a \"fused\" group in the same Zarr array.\n\nTODO:\n  - include and update output metadata / FOV ROI table\n  - test 2D / 3D\n  - optimize for large data\n  - currently optimized for search first mode, need to implement\n    registration pair finding for \"grid\" (?) mode\n"
+      "docs_info": "## stitching_task\nStitches FOVs from an OME-Zarr image.\n\nPerforms registration and fusion of FOVs indicated\nin the FOV_ROI_table of the OME-Zarr image. Writes the\nfused image back to a \"fused\" group in the same Zarr array.\n\nTodo:\n  - include and update output metadata / FOV ROI table\n  - test 2D / 3D\n  - optimize for large data\n  - currently optimized for search first mode, need to implement\n    registration pair finding for \"grid\" (?) mode\n"
     }
   ],
   "has_args_schemas": true,
-  "args_schema_version": "pydantic_v1"
+  "args_schema_version": "pydantic_v2"
 }

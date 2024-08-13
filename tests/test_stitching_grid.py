@@ -1,6 +1,7 @@
 import pytest
 
 from fractal_ome_zarr_hcs_stitching.stitching_task import stitching_task
+from fractal_ome_zarr_hcs_stitching.utils import StitchingChannelInputModel
 
 
 @pytest.mark.parametrize(
@@ -13,7 +14,7 @@ def test_stitching_2d_grid(
 ):
     image_list_updates = stitching_task(
         zarr_url=tiled_ome_zarr_2d,
-        registration_channel_label="DAPI",
+        channel=StitchingChannelInputModel(wavelength_id="A02_C01"),
         registration_resolution_level=registration_resolution_level,
     )
     expected_image_list_updates = {

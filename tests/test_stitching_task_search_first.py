@@ -2,6 +2,7 @@ import pytest
 import zarr
 
 from fractal_ome_zarr_hcs_stitching.stitching_task import stitching_task
+from fractal_ome_zarr_hcs_stitching.utils import StitchingChannelInputModel
 
 
 def test_stitching_3d_search_first(
@@ -11,7 +12,7 @@ def test_stitching_3d_search_first(
 ):
     image_list_updates = stitching_task(
         zarr_url=search_first_ome_zarr_3d,
-        registration_channel_label="DAPI",
+        channel=StitchingChannelInputModel(wavelength_id="A04_C01"),
         registration_resolution_level=registration_resolution_level,
         registration_on_z_proj=registration_on_z_proj,
     )
@@ -37,7 +38,7 @@ def test_stitching_3d_on_mip_search_first(
 ):
     image_list_updates = stitching_task(
         zarr_url=search_first_ome_zarr_3d,
-        registration_channel_label="DAPI",
+        channel=StitchingChannelInputModel(wavelength_id="A04_C01"),
         registration_resolution_level=registration_resolution_level,
         registration_on_z_proj=registration_on_z_proj,
     )
@@ -71,7 +72,7 @@ def test_stitching_2d_search_first(
 ):
     image_list_updates = stitching_task(
         zarr_url=search_first_ome_zarr_2d,
-        registration_channel_label="DAPI",
+        channel=StitchingChannelInputModel(wavelength_id="A04_C01"),
         registration_resolution_level=registration_resolution_level,
     )
     expected_image_list_updates = {
@@ -104,7 +105,7 @@ def test_stitching_overwrite(
 ):
     image_list_updates = stitching_task(
         zarr_url=search_first_ome_zarr_2d,
-        registration_channel_label="DAPI",
+        channel=StitchingChannelInputModel(wavelength_id="A04_C01"),
         registration_resolution_level=registration_resolution_level,
         overwrite_input=True,
     )
