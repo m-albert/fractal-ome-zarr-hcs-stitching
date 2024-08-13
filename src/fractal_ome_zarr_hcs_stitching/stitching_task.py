@@ -229,7 +229,7 @@ def stitching_task(
     output_zarr_url = f"{well_url}/{zarr_url.split('/')[-1]}_{output_group_suffix}"
     logger.info(f"Output fused path: {output_zarr_url}")
 
-    logging.info("Starting fusion computation")
+    logging.info("Started fusion computation")
     # Write the fused array back to the same full-resolution Zarr array
     fused_da = fused_da.to_zarr(
         f"{output_zarr_url}/0",
