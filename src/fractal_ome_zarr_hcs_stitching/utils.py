@@ -1,15 +1,18 @@
 """Fractal multiview stitcher utils."""
 
+import logging
 from pathlib import Path
 
 import dask.array as da
 import pandas as pd
-from fractal_tasks_core.channels import get_omero_channel_list
+from fractal_tasks_core.channels import (get_omero_channel_list, OmeroChannel, get_channel_from_image_zarr,
+                                         ChannelNotFoundError, ChannelInputModel)
 from fractal_tasks_core.ngff import load_NgffImageMeta
 from multiview_stitcher import msi_utils
 from multiview_stitcher import spatial_image_utils as si_utils
 from spatial_image import to_spatial_image
 
+logger = logging.getLogger(__name__)
 
 def get_sim_from_multiscales(
     multiscales_path: Path,
@@ -103,3 +106,30 @@ def get_tiles_from_sim(
         msims.append(msim)
 
     return msims
+
+
+class StitchingChannelInputModel(ChannelInputModel):
+    """
+    Channel input for stitching.
+
+    Attributes:
+        wavelength_id: Unique ID for the channel wavelength, e.g. `A01_C01`.
+            Can only be specified if label is not set.
+        label: Name of the channel. Can only be specified if wavelength_id is
+            not set.
+    """
+
+    def get_omero_channel(self, zarr_url) -> OmeroChannel:
+        try:
+            return get_channel_from_image_zarr(
+                image_zarr_path=zarr_url,
+                wavelength_id=self.wavelength_id,
+                label=self.label,
+            )
+        except ChannelNotFoundError as e:
+            logger.warning(
+                f"Channel with wavelength_id: {self.wavelength_id} "
+                f"and label: {self.label} not found, exit from the task.\n"
+                f"Original error: {str(e)}"
+            )
+            return None
