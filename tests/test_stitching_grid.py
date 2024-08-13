@@ -14,7 +14,7 @@ def test_stitching_2d_grid(
 ):
     image_list_updates = stitching_task(
         zarr_url=tiled_ome_zarr_2d,
-        channel=StitchingChannelInputModel(wavelength_id="A04_C01"),
+        channel=StitchingChannelInputModel(wavelength_id="A02_C01"),
         registration_resolution_level=registration_resolution_level,
     )
     expected_image_list_updates = {
