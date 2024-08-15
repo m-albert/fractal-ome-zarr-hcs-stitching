@@ -20,7 +20,7 @@ include = ["__FRACTAL_MANIFEST__.json"]
 
 # Allow direct references to other packages
 [tool.hatch.metadata]
-allow-direct-references = "true"
+allow-direct-references = true
 
 # Project metadata (see https://peps.python.org/pep-0621)
 [project]
