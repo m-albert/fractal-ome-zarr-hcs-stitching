@@ -92,6 +92,10 @@ def test_stitching_2d_search_first(
     ]
     with zarr.open(f"{search_first_ome_zarr_2d}_fused", mode="r") as zarr_group:
         assert zarr_group[0].shape == expected_shapes[registration_resolution_level]
+        # Ensure the omero metadata is as expected (see #21):
+        assert "metadata" not in zarr_group.attrs["multiscales"][0]
+        assert zarr_group.attrs["omero"]["channels"][0]["wavelength_id"] == "A04_C01"
+        assert zarr_group.attrs["omero"]["channels"][1]["wavelength_id"] == "A03_C02"
 
     # Check that the 2 expected OME-Zarr images exist after the task
     well_group = "/".join(search_first_ome_zarr_2d.split("/")[:-1])
