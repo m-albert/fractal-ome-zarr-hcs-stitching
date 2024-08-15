@@ -34,7 +34,7 @@ authors = [
 requires-python = ">=3.9"
 dependencies = [
     "fractal-tasks-core == 1.2.1",
-    "multiview-stitcher == 0.1.10",
+    "multiview-stitcher@git+https://github.com/multiview-stitcher/multiview-stitcher.git@3d73d87b2f28f8a55e717b5a118a6b08ed783a1a",
     "anndata",
     "ome-zarr",
     "spatial_image == 0.3.0",
