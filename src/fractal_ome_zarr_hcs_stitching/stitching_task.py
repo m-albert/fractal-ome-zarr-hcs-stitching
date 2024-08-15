@@ -267,19 +267,8 @@ def stitching_task(
                 : ngff_image_meta.num_levels
             ]
         ],
-        metadata=dict(
-            omero=dict(
-                channels=[
-                    channel.model_dump() for channel in ngff_image_meta.omero.channels
-                ]
-            )
-        ),
     )
-    # Remove the 'metadata' key from the first dictionary inside the
-    # 'multiscales' list (no idea why write_multiscales_metadata adds it twice)
-    if "metadata" in output_group.attrs["multiscales"][0]:
-        del output_group.attrs["multiscales"][0]["metadata"]
-    output_group.attrs["multiscales"] = output_group.attrs["multiscales"]
+    output_group.attrs["omero"] = ngff_image_meta.omero.model_dump()
 
     # Workaround: Manually add wavelength_id attr back to omero channel
     original_omero_attrs = zarr.open(zarr_url).attrs["omero"]["channels"]
