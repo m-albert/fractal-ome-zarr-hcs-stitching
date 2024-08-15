@@ -25,8 +25,9 @@ from ome_zarr.io import parse_url
 from pydantic import validate_call
 
 from fractal_ome_zarr_hcs_stitching.utils import (
+    StitchingChannelInputModel,
     get_sim_from_multiscales,
-    get_tiles_from_sim, StitchingChannelInputModel,
+    get_tiles_from_sim,
 )
 
 logger = logging.getLogger(__name__)
@@ -126,7 +127,10 @@ def stitching_task(
     if omero_channel:
         reg_channel_index = omero_channel.index
     else:
-        logger.info(f"Skipping stitching for {zarr_url} because {channel} is not available in that OME-Zarr image")
+        logger.info(
+            f"Skipping stitching for {zarr_url} because {channel} is "
+            "not available in that OME-Zarr image"
+        )
         return
 
     try:
@@ -265,14 +269,24 @@ def stitching_task(
         ],
         metadata=dict(
             omero=dict(
-                channels=[channel.dict() for channel in ngff_image_meta.omero.channels]
+                channels=[
+                    channel.model_dump() for channel in ngff_image_meta.omero.channels
+                ]
             )
         ),
     )
+    # Remove the 'metadata' key from the first dictionary inside the
+    # 'multiscales' list (no idea why write_multiscales_metadata adds it twice)
+    if "metadata" in output_group.attrs["multiscales"][0]:
+        del output_group.attrs["multiscales"][0]["metadata"]
+    output_group.attrs["multiscales"] = output_group.attrs["multiscales"]
+
     # Workaround: Manually add wavelength_id attr back to omero channel
     original_omero_attrs = zarr.open(zarr_url).attrs["omero"]["channels"]
     for i, omero_channel in enumerate(output_group.attrs["omero"]["channels"]):
         omero_channel["wavelength_id"] = original_omero_attrs[i]["wavelength_id"]
+    output_attrs = output_group.attrs
+    output_group.attrs["omero"] = dict(output_attrs["omero"])
 
     logger.info("Finished building resolution pyramid")
 
