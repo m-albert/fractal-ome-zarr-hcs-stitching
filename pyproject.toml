@@ -18,10 +18,6 @@ sources = ["src"]
 [tool.hatch.build]
 include = ["__FRACTAL_MANIFEST__.json"]
 
-# Allow direct references to other packages
-[tool.hatch.metadata]
-allow-direct-references = true
-
 # Project metadata (see https://peps.python.org/pep-0621)
 [project]
 name = "fractal-ome-zarr-hcs-stitching"
@@ -37,7 +33,7 @@ authors = [
 requires-python = ">=3.9"
 dependencies = [
     "fractal-tasks-core == 1.2.1",
-    "multiview-stitcher@git+https://github.com/multiview-stitcher/multiview-stitcher.git@3d5d9a306a3dad551d1bd31bf942f709696445b8",
+    "multiview-stitcher == 0.1.14",
     "anndata",
     "ome-zarr",
     "spatial_image == 0.3.0",
