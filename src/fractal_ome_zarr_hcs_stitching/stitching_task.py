@@ -70,7 +70,7 @@ def stitching_task(
             projection along z in case of 3D data.
     """
     # Use the first of input_paths
-    logging.info(f"{zarr_url=}")
+    logger.info(f"{zarr_url=}")
 
     # Parse and log several NGFF-image metadata attributes
     ngff_image_meta = load_NgffImageMeta(zarr_url)
@@ -205,7 +205,7 @@ def stitching_task(
         dim: xim_well.data.chunksize[(-ndim + idim)] for idim, dim in enumerate(sdims)
     }
     logger.info(f"Output chunksize: {output_chunksize}")
-    logging.info("Started building fusion graph")
+    logger.info("Started building fusion graph")
 
     fused = fusion.fuse(
         sims,
@@ -223,19 +223,19 @@ def stitching_task(
     # get the dask array from the fused sim
     fused_da = fused.sel({"c": fused.coords["c"].values}).data
 
-    logging.info("Finished building fusion graph")
+    logger.info("Finished building fusion graph")
 
     well_url, old_img_path = _split_well_path_image_path(zarr_url)
     output_zarr_url = f"{well_url}/{zarr_url.split('/')[-1]}_{output_group_suffix}"
     logger.info(f"Output fused path: {output_zarr_url}")
 
-    logging.info("Started fusion computation")
+    logger.info("Started fusion computation")
     # Write the fused array back to the same full-resolution Zarr array
-    fused_da = fused_da.to_zarr(
+    fused_da.to_zarr(
         f"{output_zarr_url}/0",
         overwrite=True,
         dimension_separator="/",
-        return_stored=True,
+        return_stored=False,
         compute=True,
     )
 
