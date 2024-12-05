@@ -9,5 +9,7 @@ TASK_LIST = [
         output_types={"stitched": True},
         executable="stitching_task.py",
         meta={"cpus_per_task": 1, "mem": 4000},
+        category="Registration",
+        tags=["Multiview Stitcher", "Fusion"],
     ),
 ]
