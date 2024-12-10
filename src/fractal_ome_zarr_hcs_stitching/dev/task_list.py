@@ -10,6 +10,6 @@ TASK_LIST = [
         executable="stitching_task.py",
         meta={"cpus_per_task": 1, "mem": 4000},
         category="Registration",
-        tags=["Multiview Stitcher", "Fusion"],
+        tags=["multiview-stitcher", "Fusion", "Registration", "Stitching", "2D", "3D"],
     ),
 ]
