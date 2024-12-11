@@ -3,9 +3,14 @@ name: CI
 
 on:
   push:
-    branches: ["main"]
+    branches:
+      - main
+    tags:
+      - "v*"
   pull_request:
-    branches: ["main"]
+  workflow_dispatch:
+  release:
+    types: [published]
 
 permissions:
   contents: write  # This line gives the workflow permission to push to the repository
