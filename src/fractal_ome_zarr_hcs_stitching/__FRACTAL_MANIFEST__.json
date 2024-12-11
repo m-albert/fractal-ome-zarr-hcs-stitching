@@ -11,8 +11,12 @@
       },
       "category": "Registration",
       "tags": [
-        "Multiview Stitcher",
-        "Fusion"
+        "multiview-stitcher",
+        "Fusion",
+        "Registration",
+        "Stitching",
+        "2D",
+        "3D"
       ],
       "executable_parallel": "stitching_task.py",
       "meta_parallel": {
@@ -88,5 +92,5 @@
   ],
   "has_args_schemas": true,
   "args_schema_version": "pydantic_v2",
-  "authors": "Marvin Albert"
+  "authors": "Marvin Albert, Joel Luethi, Nicole Repina"
 }
