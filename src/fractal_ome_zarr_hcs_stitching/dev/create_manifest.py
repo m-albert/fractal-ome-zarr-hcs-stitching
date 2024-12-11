@@ -6,8 +6,15 @@ from fractal_tasks_core.dev.create_manifest import create_manifest
 
 if __name__ == "__main__":
     PACKAGE = "fractal_ome_zarr_hcs_stitching"
-    create_manifest(package=PACKAGE, custom_pydantic_models=[(
-        "fractal_ome_zarr_hcs_stitching",
-        "utils.py",
-        "StitchingChannelInputModel",
-    )])
+    AUTHORS = "Marvin Albert, Joel Luethi, Nicole Repina"
+    create_manifest(
+        package=PACKAGE,
+        authors=AUTHORS,
+        custom_pydantic_models=[
+            (
+                "fractal_ome_zarr_hcs_stitching",
+                "utils.py",
+                "StitchingChannelInputModel",
+            )
+        ],
+    )

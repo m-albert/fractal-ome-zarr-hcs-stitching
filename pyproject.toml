@@ -5,18 +5,12 @@ build-backend = "hatchling.build"
 
 # https://hatch.pypa.io/latest/config/metadata/
 [tool.hatch.version]
-#path = "src/fractal_ome_zarr_hcs_stitching/__init__.py"
 source = "vcs"
 
 # read more about configuring hatch at:
 # https://hatch.pypa.io/latest/config/build/
 [tool.hatch.build.targets.wheel]
-only-include = ["src"]
-sources = ["src"]
-
-# Always include the __FRACTAL_MANIFEST__.json file in the package
-[tool.hatch.build]
-include = ["__FRACTAL_MANIFEST__.json"]
+packages = ["src/fractal_ome_zarr_hcs_stitching"]
 
 # Project metadata (see https://peps.python.org/pep-0621)
 [project]
@@ -32,7 +26,7 @@ authors = [
 # Required Python version and dependencies
 requires-python = ">=3.9"
 dependencies = [
-    "fractal-tasks-core == 1.2.1",
+    "fractal-tasks-core == 1.3.3",
     "multiview-stitcher == 0.1.15",
     "anndata",
     "ome-zarr",
