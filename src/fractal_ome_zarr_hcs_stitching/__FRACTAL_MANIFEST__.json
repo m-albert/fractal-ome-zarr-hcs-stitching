@@ -87,7 +87,8 @@
         "type": "object",
         "title": "StitchingTask"
       },
-      "docs_info": "## stitching_task\nStitches FOVs from an OME-Zarr image.\n\nPerforms registration and fusion of FOVs indicated\nin the FOV_ROI_table of the OME-Zarr image. Writes the\nfused image back to a \"fused\" group in the same Zarr array.\n\nTodo:\n  - include and update output metadata / FOV ROI table\n  - test 2D / 3D\n  - optimize for large data\n  - currently optimized for search first mode, need to implement\n    registration pair finding for \"grid\" (?) mode\n"
+      "docs_info": "## stitching_task\nStitches FOVs from an OME-Zarr image.\n\nPerforms registration and fusion of FOVs indicated\nin the FOV_ROI_table of the OME-Zarr image. Writes the\nfused image back to a \"fused\" group in the same Zarr array.\n\nTodo:\n  - include and update output metadata / FOV ROI table\n  - test 2D / 3D\n  - optimize for large data\n  - currently optimized for search first mode, need to implement\n    registration pair finding for \"grid\" (?) mode\n",
+      "docs_link": "https://github.com/m-albert/fractal-ome-zarr-hcs-stitching"
     }
   ],
   "has_args_schemas": true,
