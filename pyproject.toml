@@ -20,7 +20,7 @@ description = "Fractal task(s) for registering and fusing OME-Zarr HCS"
 readme = "README.md"
 license = { text = "BSD-3-Clause" }
 authors = [
-    { name = "Marvin Albert", email = "marvin.albert@gmail.com" },
+    { name = "Marvin Albert, Joel Luethi, Nicole Repina", email = "marvin.albert@gmail.com" },
 ]
 
 # Required Python version and dependencies
