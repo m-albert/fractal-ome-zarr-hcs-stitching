@@ -237,6 +237,7 @@ def stitching_task(
         chunks=fused_da.chunksize,
         dtype=fused_da.dtype,
         write_empty_chunks=False,
+        fill_value=0,
         mode="w",
     )
 
