@@ -265,6 +265,7 @@ def stitching_task(
         num_levels=ngff_image_meta.num_levels,
         chunksize=xim_well.data.chunksize,
         coarsening_xy=ngff_image_meta.coarsening_xy,
+        open_array_kwargs={"write_empty_chunks": False, "fill_value": 0},
     )
 
     # attach metadata to the fused image
