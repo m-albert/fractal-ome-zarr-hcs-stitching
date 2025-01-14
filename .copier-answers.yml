@@ -1,10 +1,10 @@
 # Do not edit - changes here will be overwritten by Copier
-_commit: v0.3.0
+_commit: v0.4.4
 _src_path: gh:fractal-analytics-platform/fractal-tasks-template
 author_email: marvin.albert@gmail.com
-author_name: Marvin Albert
+author_name: Marvin Albert, Joel Luethi, Nicole Repina
 package_name: fractal_ome_zarr_hcs_stitching
 project_name: fractal-ome-zarr-hcs-stitching
 project_short_description: Fractal task(s) for registering and fusing OME-Zarr HCS
-project_url: ''
+project_url: https://github.com/m-albert/fractal-ome-zarr-hcs-stitching
 

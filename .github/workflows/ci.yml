@@ -3,9 +3,14 @@ name: CI
 
 on:
   push:
-    branches: ["main"]
+    branches:
+      - main
+    tags:
+      - "v*"
   pull_request:
-    branches: ["main"]
+  workflow_dispatch:
+  release:
+    types: [published]
 
 permissions:
   contents: write  # This line gives the workflow permission to push to the repository
@@ -40,6 +45,15 @@ jobs:
       - name: Install package & testing extras
         run: python -m pip install -e ".[dev]"
 
+      - name: Check if manifest has changed
+        run: |
+          if [ -n "$(git diff --exit-code ./src/fractal_ome_zarr_hcs_stitching/__FRACTAL_MANIFEST__.json)" ]; then
+          echo "__FRACTAL_MANIFEST__.json has changed. Please run 'python src/fractal_ome_zarr_hcs_stitching/dev/create_manifest.py' and commit the changes."
+            exit 1
+          else
+            echo "__FRACTAL_MANIFEST__.json has not changed."
+          fi
+
       - name: Cache Pooch folder
         id: cache-pooch-folder
         uses: actions/cache@v4
@@ -64,3 +78,41 @@ jobs:
         with:
             name: python-coverage-comment-action
             path: python-coverage-comment-action.txt
+
+  deploy:
+    name: Deploy
+    needs: tests
+    if: success() && startsWith(github.ref, 'refs/tags/') && github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+
+    permissions:
+      # IMPORTANT: this permission is mandatory for trusted publishing on PyPi
+      # see https://docs.pypi.org/trusted-publishers/
+      id-token: write
+      # This permission allows writing releases
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: 👷 Build
+        run: |
+          python -m pip install build
+          python -m build
+
+      - name: 🚢 Publish to PyPI
+        # TODO remove the "if: false" line when the package is ready for pypi release
+        if: false
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: './dist/*'
