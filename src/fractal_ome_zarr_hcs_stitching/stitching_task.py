@@ -229,10 +229,23 @@ def stitching_task(
     output_zarr_url = f"{well_url}/{zarr_url.split('/')[-1]}_{output_group_suffix}"
     logger.info(f"Output fused path: {output_zarr_url}")
 
+    # Open output array. This allows setting `write_empty_chunks=True`,
+    # which cannot be passed to dask.array.to_zarr below.
+    output_zarr_arr = zarr.open(
+        f"{output_zarr_url}/0",
+        shape=fused_da.shape,
+        chunks=fused_da.chunksize,
+        dtype=fused_da.dtype,
+        write_empty_chunks=False,
+        fill_value=0,
+        mode="w",
+    )
+
     logger.info("Started fusion computation")
+
     # Write the fused array back to the same full-resolution Zarr array
     fused_da.to_zarr(
-        f"{output_zarr_url}/0",
+        output_zarr_arr,
         overwrite=True,
         dimension_separator="/",
         return_stored=False,
@@ -252,6 +265,7 @@ def stitching_task(
         num_levels=ngff_image_meta.num_levels,
         chunksize=xim_well.data.chunksize,
         coarsening_xy=ngff_image_meta.coarsening_xy,
+        open_array_kwargs={"write_empty_chunks": False, "fill_value": 0},
     )
 
     # attach metadata to the fused image
