@@ -27,10 +27,10 @@ authors = [
 requires-python = ">=3.10"
 dependencies = [
     "fractal-tasks-core == 1.4.2",
-    "multiview-stitcher == 0.1.15",
+    "multiview-stitcher == 0.1.19",
     "anndata",
     "ome-zarr",
-    "spatial_image == 0.3.0",
+    "spatial_image == 1.1.0",
     ]
 
 # Optional dependencies (e.g. for `pip install -e ".[dev]"`, see
