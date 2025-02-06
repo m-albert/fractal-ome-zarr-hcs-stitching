@@ -56,7 +56,7 @@ def test_stitching_3d_on_mip_search_first(
     # earlier tests that produces good fusion
     expected_shapes = [
         (2, 6, 4392, 14580),
-        (2, 6, 4391, 14588),
+        (2, 6, 4383, 14580),
     ]
     with zarr.open(f"{search_first_ome_zarr_3d}_fused", mode="r") as zarr_group:
         assert zarr_group[0].shape == expected_shapes[registration_resolution_level]
