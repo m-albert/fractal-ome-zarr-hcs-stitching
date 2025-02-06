@@ -141,6 +141,7 @@ def stitching_task(
             new_transform_key=fusion_transform_key,
             reg_channel_index=reg_channel_index,
             registration_binning={dim: 1 for dim in reg_spatial_dims},
+            pre_registration_pruning_method="keep_axis_aligned",
         )
         shifts = {
             ip: {
