@@ -1,18 +1,25 @@
 """Fractal multiview stitcher utils."""
 
 import logging
+from enum import Enum
 from pathlib import Path
 
 import dask.array as da
 import pandas as pd
-from fractal_tasks_core.channels import (get_omero_channel_list, OmeroChannel, get_channel_from_image_zarr,
-                                         ChannelNotFoundError, ChannelInputModel)
+from fractal_tasks_core.channels import (
+    ChannelInputModel,
+    ChannelNotFoundError,
+    OmeroChannel,
+    get_channel_from_image_zarr,
+    get_omero_channel_list,
+)
 from fractal_tasks_core.ngff import load_NgffImageMeta
 from multiview_stitcher import msi_utils
 from multiview_stitcher import spatial_image_utils as si_utils
 from spatial_image import to_spatial_image
 
 logger = logging.getLogger(__name__)
+
 
 def get_sim_from_multiscales(
     multiscales_path: Path,
@@ -109,8 +116,7 @@ def get_tiles_from_sim(
 
 
 class StitchingChannelInputModel(ChannelInputModel):
-    """
-    Channel input for stitching.
+    """Channel input for stitching.
 
     Attributes:
         wavelength_id: Unique ID for the channel wavelength, e.g. `A01_C01`.
@@ -120,6 +126,7 @@ class StitchingChannelInputModel(ChannelInputModel):
     """
 
     def get_omero_channel(self, zarr_url) -> OmeroChannel:
+        """Get the omero channel from the zarr url"""
         try:
             return get_channel_from_image_zarr(
                 image_zarr_path=zarr_url,
@@ -130,6 +137,24 @@ class StitchingChannelInputModel(ChannelInputModel):
             logger.warning(
                 f"Channel with wavelength_id: {self.wavelength_id} "
                 f"and label: {self.label} not found, exit from the task.\n"
-                f"Original error: {str(e)}"
+                f"Original error: {e!s}"
             )
             return None
+
+
+class PreRegistrationPruningMethod(Enum):
+    """PreRegistrationPruningMethod Enum class
+
+    Attributes:
+        NONE: All overlapping tiles are used for registration.
+        KEEPAXISALIGNED: Use only orthogonal tile pairs for registration.
+            This excludes diagonal tile pairs and can lead to more robust
+            registration results when tiles are not positioned irregularily.
+        SHORTESTPATHSOVERLAPWEIGHTED: Only the tile pairs required to connect
+            all tiles to an automatically determined reference tile are used
+            for registration. Tile pairs with high overlaps are preferred.
+    """
+
+    NONE = None
+    KEEPAXISALIGNED = "keep_axis_aligned"
+    SHORTESTPATHSOVERLAPWEIGHTED = "shortest_paths_overlap_weighted"
