@@ -146,7 +146,7 @@ class PreRegistrationPruningMethod(Enum):
     """PreRegistrationPruningMethod Enum class
 
     Attributes:
-        NONE: All overlapping tiles are used for registration.
+        NOPRUNING: All overlapping tiles are used for registration.
         KEEPAXISALIGNED: Use only orthogonal tile pairs for registration.
             This excludes diagonal tile pairs and can lead to more robust
             registration results when tiles are not positioned irregularily.
@@ -155,6 +155,15 @@ class PreRegistrationPruningMethod(Enum):
             for registration. Tile pairs with high overlaps are preferred.
     """
 
-    NONE = None
+    NOPRUNING = "no_pruning"
     KEEPAXISALIGNED = "keep_axis_aligned"
     SHORTESTPATHSOVERLAPWEIGHTED = "shortest_paths_overlap_weighted"
+
+    def get_pruning_method(self):
+        """Get the pruning method to use
+
+        Complex mapping for no pruning, see
+        https://github.com/fractal-analytics-platform/fractal-web/issues/714
+        for context. NOPRUNING should return a None, not the string.
+        """
+        return None if self == PreRegistrationPruningMethod.NOPRUNING else self.value

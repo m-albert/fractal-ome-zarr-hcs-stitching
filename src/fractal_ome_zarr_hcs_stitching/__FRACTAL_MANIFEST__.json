@@ -28,11 +28,12 @@
           "PreRegistrationPruningMethod": {
             "description": "PreRegistrationPruningMethod Enum class",
             "enum": [
-              null,
+              "no_pruning",
               "keep_axis_aligned",
               "shortest_paths_overlap_weighted"
             ],
-            "title": "PreRegistrationPruningMethod"
+            "title": "PreRegistrationPruningMethod",
+            "type": "string"
           },
           "StitchingChannelInputModel": {
             "description": "Channel input for stitching.",
@@ -96,7 +97,7 @@
             ],
             "default": "keep_axis_aligned",
             "title": "Pre Registration Pruning Method",
-            "description": "Method to use for selecting a subset of all overlapping tiles for pairwise registration. By default, only lower, upper, right and left neighbors are considered. Make sure to set this parameter to NONE if pairs of tiles which deviate from this pattern need to be registered."
+            "description": "Method to use for selecting a subset of all overlapping tiles for pairwise registration. By default, only lower, upper, right and left neighbors are considered. Set this parameter to no_pruning if pairs of tiles which deviate from this pattern need to be registered."
           }
         },
         "required": [

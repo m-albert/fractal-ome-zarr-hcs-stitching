@@ -72,8 +72,8 @@ def stitching_task(
             projection along z in case of 3D data.
         pre_registration_pruning_method: Method to use for selecting a subset
             of all overlapping tiles for pairwise registration. By default,
-            only lower, upper, right and left neighbors are considered. Make
-            sure to set this parameter to NONE if pairs of tiles which deviate
+            only lower, upper, right and left neighbors are considered. Set
+            this parameter to no_pruning if pairs of tiles which deviate
             from this pattern need to be registered.
     """
     # Use the first of input_paths
@@ -148,7 +148,7 @@ def stitching_task(
             new_transform_key=fusion_transform_key,
             reg_channel_index=reg_channel_index,
             registration_binning={dim: 1 for dim in reg_spatial_dims},
-            pre_registration_pruning_method=pre_registration_pruning_method.value,
+            pre_registration_pruning_method=pre_registration_pruning_method.get_pruning_method(),
         )
         shifts = {
             ip: {

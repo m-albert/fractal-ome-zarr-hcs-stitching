@@ -31,7 +31,12 @@ def test_stitching_3d_search_first(
     # outputs is not very meaningful here
 
 
+@pytest.mark.parametrize(
+    "pre_registration_pruning_method",
+    ["keep_axis_aligned", "shortest_paths_overlap_weighted", "no_pruning"],
+)
 def test_stitching_3d_on_mip_search_first(
+    pre_registration_pruning_method,
     search_first_ome_zarr_3d,
     registration_resolution_level=1,
     registration_on_z_proj=True,
@@ -41,6 +46,7 @@ def test_stitching_3d_on_mip_search_first(
         channel=StitchingChannelInputModel(wavelength_id="A04_C01"),
         registration_resolution_level=registration_resolution_level,
         registration_on_z_proj=registration_on_z_proj,
+        pre_registration_pruning_method=pre_registration_pruning_method,
     )
     expected_image_list_updates = {
         "image_list_updates": [
@@ -54,12 +60,13 @@ def test_stitching_3d_on_mip_search_first(
 
     # Validate expected shape of the Zarr based on what was produced in
     # earlier tests that produces good fusion
-    expected_shapes = [
-        (2, 6, 4392, 14580),
-        (2, 6, 4383, 14580),
-    ]
+    expected_shapes = {
+        "keep_axis_aligned": (2, 6, 4383, 14580),
+        "shortest_paths_overlap_weighted": (2, 6, 4383, 14580),
+        "no_pruning": (2, 6, 4379, 14564),
+    }
     with zarr.open(f"{search_first_ome_zarr_3d}_fused", mode="r") as zarr_group:
-        assert zarr_group[0].shape == expected_shapes[registration_resolution_level]
+        assert zarr_group[0].shape == expected_shapes[pre_registration_pruning_method]
 
 
 @pytest.mark.parametrize(
