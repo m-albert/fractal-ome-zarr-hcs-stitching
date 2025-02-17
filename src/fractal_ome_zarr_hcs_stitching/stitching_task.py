@@ -25,6 +25,7 @@ from ome_zarr.io import parse_url
 from pydantic import validate_call
 
 from fractal_ome_zarr_hcs_stitching.utils import (
+    PreRegistrationPruningMethod,
     StitchingChannelInputModel,
     get_sim_from_multiscales,
     get_tiles_from_sim,
@@ -42,6 +43,7 @@ def stitching_task(
     output_group_suffix: str = "fused",
     registration_resolution_level: int = 0,
     registration_on_z_proj: bool = True,
+    pre_registration_pruning_method: PreRegistrationPruningMethod = PreRegistrationPruningMethod.KEEPAXISALIGNED,  # noqa: E501
 ) -> None:
     """Stitches FOVs from an OME-Zarr image.
 
@@ -68,6 +70,11 @@ def stitching_task(
         registration_resolution_level: Resolution level to use for registration.
         registration_on_z_proj: Whether to perform registration on a maximum
             projection along z in case of 3D data.
+        pre_registration_pruning_method: Method to use for selecting a subset
+            of all overlapping tiles for pairwise registration. By default,
+            only lower, upper, right and left neighbors are considered. Set
+            this parameter to no_pruning if pairs of tiles which deviate
+            from this pattern need to be registered.
     """
     # Use the first of input_paths
     logger.info(f"{zarr_url=}")
@@ -141,6 +148,7 @@ def stitching_task(
             new_transform_key=fusion_transform_key,
             reg_channel_index=reg_channel_index,
             registration_binning={dim: 1 for dim in reg_spatial_dims},
+            pre_registration_pruning_method=pre_registration_pruning_method.get_pruning_method(),
         )
         shifts = {
             ip: {

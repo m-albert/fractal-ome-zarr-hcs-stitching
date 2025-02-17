@@ -25,6 +25,16 @@
       },
       "args_schema_parallel": {
         "$defs": {
+          "PreRegistrationPruningMethod": {
+            "description": "PreRegistrationPruningMethod Enum class",
+            "enum": [
+              "no_pruning",
+              "keep_axis_aligned",
+              "shortest_paths_overlap_weighted"
+            ],
+            "title": "PreRegistrationPruningMethod",
+            "type": "string"
+          },
           "StitchingChannelInputModel": {
             "description": "Channel input for stitching.",
             "properties": {
@@ -78,6 +88,16 @@
             "title": "Registration On Z Proj",
             "type": "boolean",
             "description": "Whether to perform registration on a maximum projection along z in case of 3D data."
+          },
+          "pre_registration_pruning_method": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/PreRegistrationPruningMethod"
+              }
+            ],
+            "default": "keep_axis_aligned",
+            "title": "Pre Registration Pruning Method",
+            "description": "Method to use for selecting a subset of all overlapping tiles for pairwise registration. By default, only lower, upper, right and left neighbors are considered. Set this parameter to no_pruning if pairs of tiles which deviate from this pattern need to be registered."
           }
         },
         "required": [
