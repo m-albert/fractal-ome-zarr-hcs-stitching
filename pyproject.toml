@@ -30,7 +30,6 @@ dependencies = [
     "multiview-stitcher == 0.1.42",
     "anndata",
     "ome-zarr",
-    "spatial_image == 1.1.0",
     ]
 
 # Optional dependencies (e.g. for `pip install -e ".[dev]"`, see
