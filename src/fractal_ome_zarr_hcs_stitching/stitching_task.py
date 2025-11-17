@@ -234,7 +234,7 @@ def stitching_task(
     logger.info("Finished building fusion graph")
 
     well_url, old_img_path = _split_well_path_image_path(zarr_url)
-    output_zarr_url = f"{well_url}/{zarr_url.split('/')[-1]}_{output_group_suffix}"
+    output_zarr_url = f"{well_url}/{zarr_url.split('/')[-1]}{output_group_suffix}"
     logger.info(f"Output fused path: {output_zarr_url}")
 
     # Open output array. This allows setting `write_empty_chunks=True`,
