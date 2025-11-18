@@ -72,7 +72,7 @@
             "description": "Whether to override the original, not stitched image with the output of this task."
           },
           "output_group_suffix": {
-            "default": "fused",
+            "default": "_fused",
             "title": "Output Group Suffix",
             "type": "string",
             "description": "Suffix of the new OME-Zarr image to write the fused image to."
@@ -98,12 +98,6 @@
             "default": "keep_axis_aligned",
             "title": "Pre Registration Pruning Method",
             "description": "Method to use for selecting a subset of all overlapping tiles for pairwise registration. By default, only lower, upper, right and left neighbors are considered. Set this parameter to no_pruning if pairs of tiles which deviate from this pattern need to be registered."
-          },
-          "prefix_suffix_separator": {
-            "default": "_",
-            "title": "Prefix-Suffix Separator",
-            "type": "string",
-            "description": "Separator between original group name and suffix for the output fused group. Exposed as a parameter as OME-Zarr (at least up to v0.5) doesn't allow non-alphanumeric characters in group names (set to empty string for compliance)."
           }
         },
         "required": [

@@ -40,11 +40,10 @@ def stitching_task(
     zarr_url: str,
     channel: StitchingChannelInputModel,
     overwrite_input: bool = False,
-    output_group_suffix: str = "fused",
+    output_group_suffix: str = "_fused",
     registration_resolution_level: int = 0,
     registration_on_z_proj: bool = True,
     pre_registration_pruning_method: PreRegistrationPruningMethod = PreRegistrationPruningMethod.KEEPAXISALIGNED,  # noqa: E501
-    prefix_suffix_separator: str = "_",
 ) -> None:
     """Stitches FOVs from an OME-Zarr image.
 
@@ -67,7 +66,9 @@ def stitching_task(
         overwrite_input: Whether to override the original, not stitched image
             with the output of this task.
         output_group_suffix: Suffix of the new OME-Zarr image to write the
-            fused image to.
+            fused image to. Note that OME-Zarr (at least up to v0.5) doesn't
+            allow non-alphanumeric characters in group names (set to e.g.
+            just 'fused' instead of '_fused' for compliance).
         registration_resolution_level: Resolution level to use for registration.
         registration_on_z_proj: Whether to perform registration on a maximum
             projection along z in case of 3D data.
@@ -76,10 +77,6 @@ def stitching_task(
             only lower, upper, right and left neighbors are considered. Set
             this parameter to no_pruning if pairs of tiles which deviate
             from this pattern need to be registered.
-        prefix_suffix_separator: Separator between original group name
-            and suffix for the output fused group. Exposed as a parameter
-            as OME-Zarr (at least up to v0.5) doesn't allow non-alphanumeric
-            characters in group names (set to empty string for compliance).
     """
     # Use the first of input_paths
     logger.info(f"{zarr_url=}")
@@ -240,8 +237,7 @@ def stitching_task(
 
     well_url, old_img_path = _split_well_path_image_path(zarr_url)
 
-    output_zarr_url = f"{well_url}/{zarr_url.split('/')[-1]}"\
-        f"{prefix_suffix_separator}{output_group_suffix}"
+    output_zarr_url = f"{well_url}/{zarr_url.split('/')[-1]}{output_group_suffix}"
     logger.info(f"Output fused path: {output_zarr_url}")
 
     # Open output array. This allows setting `write_empty_chunks=True`,
