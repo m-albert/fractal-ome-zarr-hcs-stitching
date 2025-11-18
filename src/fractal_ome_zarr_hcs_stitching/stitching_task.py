@@ -44,6 +44,7 @@ def stitching_task(
     registration_resolution_level: int = 0,
     registration_on_z_proj: bool = True,
     pre_registration_pruning_method: PreRegistrationPruningMethod = PreRegistrationPruningMethod.KEEPAXISALIGNED,  # noqa: E501
+    prefix_suffix_separator: str = "_",
 ) -> None:
     """Stitches FOVs from an OME-Zarr image.
 
@@ -75,6 +76,10 @@ def stitching_task(
             only lower, upper, right and left neighbors are considered. Set
             this parameter to no_pruning if pairs of tiles which deviate
             from this pattern need to be registered.
+        prefix_suffix_separator: Separator between original group name
+            and suffix for the output fused group. Exposed as a parameter
+            as OME-Zarr (at least up to v0.5) doesn't allow non-alphanumeric
+            characters in group names (set to empty string for compliance).
     """
     # Use the first of input_paths
     logger.info(f"{zarr_url=}")
@@ -234,7 +239,9 @@ def stitching_task(
     logger.info("Finished building fusion graph")
 
     well_url, old_img_path = _split_well_path_image_path(zarr_url)
-    output_zarr_url = f"{well_url}/{zarr_url.split('/')[-1]}{output_group_suffix}"
+
+    output_zarr_url = f"{well_url}/{zarr_url.split('/')[-1]}"\
+        f"{prefix_suffix_separator}{output_group_suffix}"
     logger.info(f"Output fused path: {output_zarr_url}")
 
     # Open output array. This allows setting `write_empty_chunks=True`,
