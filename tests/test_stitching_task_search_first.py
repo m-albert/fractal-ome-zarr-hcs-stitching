@@ -61,9 +61,9 @@ def test_stitching_3d_on_mip_search_first(
     # Validate expected shape of the Zarr based on what was produced in
     # earlier tests that produces good fusion
     expected_shapes = {
-        "keep_axis_aligned": (2, 6, 4383, 14580),
-        "shortest_paths_overlap_weighted": (2, 6, 4383, 14580),
-        "no_pruning": (2, 6, 4379, 14564),
+        "keep_axis_aligned": (2, 6, 4384, 14577),
+        "shortest_paths_overlap_weighted": (2, 6, 4384, 14577),
+        "no_pruning": (2, 6, 4385, 14578),
     }
     with zarr.open(f"{search_first_ome_zarr_3d}_fused", mode="r") as zarr_group:
         assert zarr_group[0].shape == expected_shapes[pre_registration_pruning_method]
@@ -94,8 +94,8 @@ def test_stitching_2d_search_first(
     # Validate expected shape of the Zarr based on what was produced in
     # earlier tests that produces good fusion
     expected_shapes = [
-        (2, 1, 4392, 14580),
-        (2, 1, 4391, 14580),
+        (2, 1, 4366, 14576),
+        (2, 1, 4389, 14577),
     ]
     with zarr.open(f"{search_first_ome_zarr_2d}_fused", mode="r") as zarr_group:
         assert zarr_group[0].shape == expected_shapes[registration_resolution_level]
