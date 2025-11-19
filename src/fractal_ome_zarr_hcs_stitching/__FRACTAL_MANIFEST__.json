@@ -75,7 +75,7 @@
             "default": "_fused",
             "title": "Output Group Suffix",
             "type": "string",
-            "description": "Suffix of the new OME-Zarr image to write the fused image to."
+            "description": "Suffix of the new OME-Zarr image to write the fused image to. Note that OME-Zarr (at least up to v0.5) doesn't allow non-alphanumeric characters in group names (set to e.g. just 'fused' instead of '_fused' for compliance)."
           },
           "registration_resolution_level": {
             "default": 0,
