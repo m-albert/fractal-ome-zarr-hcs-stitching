@@ -17,7 +17,13 @@ from fractal_tasks_core.tasks._zarr_utils import (
     _split_well_path_image_path,
     _update_well_metadata,
 )
-from multiview_stitcher import fusion, msi_utils, param_utils, registration
+from multiview_stitcher import (
+    fusion,
+    misc_utils,
+    msi_utils,
+    param_utils,
+    registration,
+)
 from multiview_stitcher import spatial_image_utils as si_utils
 from multiview_stitcher.mv_graph import NotEnoughOverlapError
 from ome_zarr import writer
@@ -44,6 +50,8 @@ def stitching_task(
     registration_resolution_level: int = 0,
     registration_on_z_proj: bool = True,
     pre_registration_pruning_method: PreRegistrationPruningMethod = PreRegistrationPruningMethod.KEEPAXISALIGNED,  # noqa: E501
+    registration_n_jobs: int = 4,
+    fusion_n_jobs: int = 4,
 ) -> None:
     """Stitches FOVs from an OME-Zarr image.
 
@@ -77,6 +85,13 @@ def stitching_task(
             only lower, upper, right and left neighbors are considered. Set
             this parameter to no_pruning if pairs of tiles which deviate
             from this pattern need to be registered.
+        registration_n_jobs: Number of parallel pairwise registrations to run.
+            Setting this is specifically useful for limiting memory usage.
+            Default is 4. Set to None to run all pairwise registrations in
+            parallel.
+        fusion_n_jobs: Number of parallel jobs to use for fusion to zarr.
+            Uses joblib for parallelization. It makes sense to set
+            this to the number of cores available to the task. Default is 4.
     """
     # Use the first of input_paths
     logger.info(f"{zarr_url=}")
@@ -151,6 +166,7 @@ def stitching_task(
             reg_channel_index=reg_channel_index,
             registration_binning={dim: 1 for dim in reg_spatial_dims},
             pre_registration_pruning_method=pre_registration_pruning_method.get_pruning_method(),
+            n_parallel_pairwise_regs=registration_n_jobs,
         )
         shifts = {
             ip: {
@@ -230,6 +246,7 @@ def stitching_task(
     # Fuse directly to zarr at highest resolution (level 0)
     # This writes only the full-resolution data without building a large dask graph
     logger.info("Started fusion computation (direct to zarr)")
+    logger.info(f"Using {fusion_n_jobs} parallel jobs.")
     
     fused = fusion.fuse(
         sims,
@@ -241,6 +258,13 @@ def stitching_task(
         zarr_options={
             "ome_zarr": False,  # Don't create OME-Zarr metadata yet
             "overwrite": True,
+        },
+        batch_options={
+            "batch_func": misc_utils.process_batch_using_joblib,
+            "n_batch": 1000, # num of chunks to schedule at once in joblib
+            "batch_func_kwargs": {
+                "n_jobs": fusion_n_jobs,
+            },
         },
     )
     

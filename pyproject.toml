@@ -30,6 +30,7 @@ dependencies = [
     "multiview-stitcher == 0.1.43",
     "anndata",
     "ome-zarr",
+    "joblib",
     ]
 
 # Optional dependencies (e.g. for `pip install -e ".[dev]"`, see
