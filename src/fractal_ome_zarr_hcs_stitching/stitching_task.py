@@ -206,6 +206,12 @@ def stitching_task(
         )
 
     sims = [msi_utils.get_sim_from_msim(msim) for msim in msims_fusion]
+    
+    # If "t" not in input_dims, remove the dimension from sims before
+    # fusion to avoid writing t dim to zarr:
+    # multiview-stitcher currently adds and/or requires a (at least dummy) t dimension
+    sims = [si_utils.sim_sel_coords(sim, sel_dict={'t': 0}) for sim in sims]
+    
     sdims = si_utils.get_spatial_dims_from_sim(xim_well)
     ndim = len(sdims)
 
@@ -215,54 +221,32 @@ def stitching_task(
         dim: xim_well.data.chunksize[(-ndim + idim)] for idim, dim in enumerate(sdims)
     }
     logger.info(f"Output chunksize: {output_chunksize}")
-    logger.info("Started building fusion graph")
-
-    fused = fusion.fuse(
-        sims,
-        transform_key=fusion_transform_key,
-        output_chunksize=output_chunksize,
-        output_spacing=si_utils.get_spacing_from_sim(sims[0]),
-        # fusion_func=fusion.max_fusion,
-    )
-
-    fused = fused.sel(t=0, drop=True)
-
-    if "z" not in fused.dims:
-        fused = fused.expand_dims("z", xim_well.dims.index("z"))
-
-    # get the dask array from the fused sim
-    fused_da = fused.sel({"c": fused.coords["c"].values}).data
-
-    logger.info("Finished building fusion graph")
 
     well_url, old_img_path = _split_well_path_image_path(zarr_url)
 
     output_zarr_url = f"{well_url}/{zarr_url.split('/')[-1]}{output_group_suffix}"
     logger.info(f"Output fused path: {output_zarr_url}")
 
-    # Open output array. This allows setting `write_empty_chunks=True`,
-    # which cannot be passed to dask.array.to_zarr below.
-    output_zarr_arr = zarr.open(
-        f"{output_zarr_url}/0",
-        shape=fused_da.shape,
-        chunks=fused_da.chunksize,
-        dtype=fused_da.dtype,
-        write_empty_chunks=False,
-        dimension_separator="/",
-        fill_value=0,
-        mode="w",
+    # Fuse directly to zarr at highest resolution (level 0)
+    # This writes only the full-resolution data without building a large dask graph
+    logger.info("Started fusion computation (direct to zarr)")
+    
+    fused = fusion.fuse(
+        sims,
+        transform_key=fusion_transform_key,
+        output_chunksize=output_chunksize,
+        output_spacing=si_utils.get_spacing_from_sim(sims[0]),
+        # fusion_func=fusion.max_fusion,
+        output_zarr_url=f"{output_zarr_url}/0",
+        zarr_options={
+            "ome_zarr": False,  # Don't create OME-Zarr metadata yet
+            "overwrite": True,
+        },
     )
-
-    logger.info("Started fusion computation")
-
-    # Write the fused array back to the same full-resolution Zarr array
-    fused_da.to_zarr(
-        output_zarr_arr,
-        overwrite=True,
-        dimension_separator="/",
-        return_stored=False,
-        compute=True,
-    )
+    
+    # fused is a SpatialImage backed by the zarr store
+    if "z" not in fused.dims:
+        fused = fused.expand_dims("z", xim_well.dims.index("z"))
 
     logger.info("Finished fusion computation")
     logger.info("Started building resolution pyramid")
@@ -321,7 +305,7 @@ def stitching_task(
         .coordinateTransformations[0]
         .scale[-3:]
     )
-    image_ROI_table = get_single_image_ROI(fused_da.shape, pixels_ZYX=pixels_ZYX)
+    image_ROI_table = get_single_image_ROI(fused.data.shape, pixels_ZYX=pixels_ZYX)
     write_table(
         output_group,
         "well_ROI_table",  # Could also be image_ROI_table
