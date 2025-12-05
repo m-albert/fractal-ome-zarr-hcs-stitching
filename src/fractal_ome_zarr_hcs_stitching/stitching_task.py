@@ -87,11 +87,13 @@ def stitching_task(
             from this pattern need to be registered.
         registration_n_jobs: Number of parallel pairwise registrations to run.
             Setting this is specifically useful for limiting memory usage.
-            Default is 4. Set to None to run all pairwise registrations in
-            parallel.
+            If the task runs out of memory during registration, reduce this number.
+            Default is 4.
         fusion_n_jobs: Number of parallel jobs to use for fusion to zarr.
             Uses joblib for parallelization. It makes sense to set
-            this to the number of cores available to the task. Default is 4.
+            this to the number of cores available to the task. If the task
+            runs out of memory during fusion, reduce this number.
+            Default is 4.
     """
     # Use the first of input_paths
     logger.info(f"{zarr_url=}")
