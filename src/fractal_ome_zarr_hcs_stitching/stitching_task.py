@@ -50,8 +50,8 @@ def stitching_task(
     registration_resolution_level: int = 0,
     registration_on_z_proj: bool = True,
     pre_registration_pruning_method: PreRegistrationPruningMethod = PreRegistrationPruningMethod.KEEPAXISALIGNED,  # noqa: E501
-    registration_n_jobs: int = 4,
-    fusion_n_jobs: int = 4,
+    registration_n_jobs: int = 16,
+    fusion_n_jobs: int = 16,
 ) -> None:
     """Stitches FOVs from an OME-Zarr image.
 
