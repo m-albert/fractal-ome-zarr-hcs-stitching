@@ -225,16 +225,9 @@ def stitching_task(
     # fusion to avoid writing t dim to zarr:
     # multiview-stitcher currently adds and/or requires a (at least dummy) t dimension
     sims = [si_utils.sim_sel_coords(sim, sel_dict={'t': 0}) for sim in sims]
-    
-    sdims = si_utils.get_spatial_dims_from_sim(xim_well)
-    ndim = len(sdims)
 
     logger.info(f"Started fusion using transform key {fusion_transform_key}")
 
-    output_chunksize = {
-        dim: xim_well.data.chunksize[(-ndim + idim)] for idim, dim in enumerate(sdims)
-    }
-    logger.info(f"Output chunksize: {output_chunksize}")
 
     well_url, old_img_path = _split_well_path_image_path(zarr_url)
 
@@ -249,7 +242,8 @@ def stitching_task(
     fused = fusion.fuse(
         sims,
         transform_key=fusion_transform_key,
-        output_chunksize=output_chunksize,
+        output_chunksize={dim: sims[0].data.chunksize[idim]
+                          for idim, dim in enumerate(sims[0].dims)},
         output_spacing=si_utils.get_spacing_from_sim(sims[0]),
         # fusion_func=fusion.max_fusion,
         output_zarr_url=f"{output_zarr_url}/0",
@@ -265,10 +259,6 @@ def stitching_task(
             },
         },
     )
-    
-    # fused is a SpatialImage backed by the zarr store
-    if "z" not in fused.dims:
-        fused = fused.expand_dims("z", xim_well.dims.index("z"))
 
     logger.info("Finished fusion computation")
     logger.info("Started building resolution pyramid")
@@ -281,7 +271,7 @@ def stitching_task(
         zarrurl=output_zarr_url,
         overwrite=True,
         num_levels=ngff_image_meta.num_levels,
-        chunksize=xim_well.data.chunksize,
+        chunksize=sims[0].data.chunksize,
         coarsening_xy=ngff_image_meta.coarsening_xy,
         open_array_kwargs={"write_empty_chunks": False, "fill_value": 0},
     )
