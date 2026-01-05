@@ -26,17 +26,19 @@ description = "Fractal task(s) for registering and fusing OME-Zarr HCS"
     # Required Python version and dependencies
     requires-python = ">=3.11"
 dependencies = [
-    "fractal-tasks-core == 1.5.4",
+    "fractal-tasks-core == 1.5.6",
     "multiview-stitcher == 0.1.43",
     "anndata",
     "ome-zarr",
     "joblib",
+    "xarray < 2025.5",
     ]
 
 # Optional dependencies (e.g. for `pip install -e ".[dev]"`, see
 # https://peps.python.org/pep-0621/#dependencies-optional-dependencies)
 [project.optional-dependencies]
-dev = ["devtools", "hatch", "pytest", "requests", "jsonschema", "ruff", "pre-commit", "pooch", "coverage"]
+dev = ["devtools", "hatch", "pytest", "requests", "jsonschema", "ruff", "pre-commit", "pooch", "coverage", "fractal-task-tools"]
+play = ["jupyter", "ipympl"]
 
 # https://docs.astral.sh/ruff
 [tool.ruff]
