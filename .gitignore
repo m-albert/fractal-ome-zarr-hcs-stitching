@@ -121,3 +121,6 @@ __pycache__/
 .coverage
 dist/
 _playground/run_example.py
+# pixi environments
+.pixi/*
+!.pixi/config.toml
