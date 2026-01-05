@@ -5,6 +5,10 @@ from fractal_ome_zarr_hcs_stitching.stitching_task import stitching_task
 from fractal_ome_zarr_hcs_stitching.utils import StitchingChannelInputModel
 
 
+TESTING_REGISTRATION_N_JOBS = 16
+TESTING_FUSION_N_JOBS = 16
+
+
 def test_stitching_3d_search_first(
     search_first_ome_zarr_3d,
     registration_resolution_level=1,
@@ -47,6 +51,8 @@ def test_stitching_3d_on_mip_search_first(
         registration_resolution_level=registration_resolution_level,
         registration_on_z_proj=registration_on_z_proj,
         pre_registration_pruning_method=pre_registration_pruning_method,
+        registration_n_jobs=TESTING_REGISTRATION_N_JOBS,
+        fusion_n_jobs=TESTING_FUSION_N_JOBS,
     )
     expected_image_list_updates = {
         "image_list_updates": [
@@ -81,6 +87,8 @@ def test_stitching_2d_search_first(
         zarr_url=search_first_ome_zarr_2d,
         channel=StitchingChannelInputModel(wavelength_id="A04_C01"),
         registration_resolution_level=registration_resolution_level,
+        registration_n_jobs=TESTING_REGISTRATION_N_JOBS,
+        fusion_n_jobs=TESTING_FUSION_N_JOBS,
     )
     expected_image_list_updates = {
         "image_list_updates": [
@@ -123,6 +131,8 @@ def test_stitching_overwrite(
         channel=StitchingChannelInputModel(wavelength_id="A04_C01"),
         registration_resolution_level=registration_resolution_level,
         overwrite_input=True,
+        registration_n_jobs=TESTING_REGISTRATION_N_JOBS,
+        fusion_n_jobs=TESTING_FUSION_N_JOBS,
     )
     assert image_list_updates is None
     well_group = "/".join(search_first_ome_zarr_2d.split("/")[:-1])
