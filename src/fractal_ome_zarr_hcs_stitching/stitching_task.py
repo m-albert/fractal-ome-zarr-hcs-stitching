@@ -126,12 +126,8 @@ def stitching_task(
         Path(zarr_url), resolution=registration_resolution_level
     )  # could also be lower resolution
 
-    input_spatial_dims = si_utils.get_spatial_dims_from_sim(
-        xim_well_reg.squeeze(drop=True)
-    )
-
     # determine whether to perform registration on maximum projection in Z
-    reg_max_project_z = registration_on_z_proj and ("z" in input_spatial_dims)
+    reg_max_project_z = registration_on_z_proj or xim_well_reg.sizes["z"] == 1
 
     if reg_max_project_z:
         xim_well_reg = xim_well_reg.max("z")

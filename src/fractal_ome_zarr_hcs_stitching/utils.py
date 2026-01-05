@@ -97,8 +97,6 @@ def get_tiles_from_sim(
             }
         )
 
-        tile = tile.squeeze(drop=True)
-
         sim = si_utils.get_sim_from_array(
             tile.data,
             dims=tile.dims,
