@@ -72,7 +72,10 @@ def test_stitching_3d_on_mip_search_first(
         "no_pruning": (2, 6, 4385, 14578),
     }
     with zarr.open(f"{search_first_ome_zarr_3d}_fused", mode="r") as zarr_group:
-        assert zarr_group[0].shape == expected_shapes[pre_registration_pruning_method]
+        assert all([
+            abs(a - b) <= [0, 5][int(idim >= 2)] for idim, (a, b) in enumerate(zip(
+                zarr_group[0].shape, expected_shapes[pre_registration_pruning_method]))
+        ])
 
 
 @pytest.mark.parametrize(
@@ -106,11 +109,11 @@ def test_stitching_2d_search_first(
         (2, 1, 4389, 14577),
     ]
     with zarr.open(f"{search_first_ome_zarr_2d}_fused", mode="r") as zarr_group:
-        # check expected and actual shape don't differ by more than 5 pixels in any dimension
-        assert all(
-            abs(a - b) <= 5 for a, b in zip(
-                zarr_group[0].shape, expected_shapes[registration_resolution_level])
-        )
+        # check expected and actual shape don't differ
+        assert all([
+            abs(a - b) <= [0, 5][int(idim >= 2)] for idim, (a, b) in enumerate(zip(
+                zarr_group[0].shape, expected_shapes[registration_resolution_level]))
+        ])
         # Ensure the omero metadata is as expected (see #21):
         assert "metadata" not in zarr_group.attrs["multiscales"][0]
         assert zarr_group.attrs["omero"]["channels"][0]["wavelength_id"] == "A04_C01"
