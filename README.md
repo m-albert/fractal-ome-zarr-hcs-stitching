@@ -5,9 +5,9 @@
 | Name                                                      |    Stmts |     Miss |   Cover |   Missing |
 |---------------------------------------------------------- | -------: | -------: | ------: | --------: |
 | src/fractal\_ome\_zarr\_hcs\_stitching/\_\_init\_\_.py    |        5 |        2 |     60% |       7-8 |
-| src/fractal\_ome\_zarr\_hcs\_stitching/stitching\_task.py |      122 |       11 |     91% |137-141, 165-169, 350-355, 366-368 |
+| src/fractal\_ome\_zarr\_hcs\_stitching/stitching\_task.py |      122 |       11 |     91% |139-143, 167-171, 353-358, 369-371 |
 | src/fractal\_ome\_zarr\_hcs\_stitching/utils.py           |       46 |        3 |     93% |   136-142 |
-|                                                 **TOTAL** |  **173** |   **16** | **91%** |           |
+| **TOTAL**                                                 |  **173** |   **16** | **91%** |           |
 
 
 ## Setup coverage badge
