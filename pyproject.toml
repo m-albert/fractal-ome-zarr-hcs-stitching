@@ -27,7 +27,7 @@ description = "Fractal task(s) for registering and fusing OME-Zarr HCS"
     requires-python = ">=3.11"
 dependencies = [
     "fractal-tasks-core == 1.5.6",
-    "multiview-stitcher == 0.1.43",
+    "multiview-stitcher == 0.1.44",
     "anndata",
     "ome-zarr",
     "joblib",
