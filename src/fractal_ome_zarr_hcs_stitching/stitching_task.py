@@ -53,18 +53,20 @@ def stitching_task(
     registration_n_jobs: int = 16,
     fusion_n_jobs: int = 16,
 ) -> None:
-    """Stitches FOVs from an OME-Zarr image.
+    """Stitches fields of view (FOV) in an OME-Zarr image.
 
-    Performs registration and fusion of FOVs indicated
-    in the FOV_ROI_table of the OME-Zarr image. Writes the
-    fused image back to a "fused" group in the same Zarr array.
+    Registers and fuses FOVs specified in the Fractal FOV_ROI_table.
+    Writes the fused image back to a group within the same OME-Zarr image.
 
-    Todo:
-      - include and update output metadata / FOV ROI table
-      - test 2D / 3D
-      - optimize for large data
-      - currently optimized for search first mode, need to implement
-        registration pair finding for "grid" (?) mode
+    Features:
+    - Input can be 2D or 3D
+    - Registration is performed
+      - on a specified resolution level
+      - on a specified channel
+      - optionally on a maximum projection for 3D data
+    - Supports large data with low memory consumption
+    - Supports regular and irregular FOV layouts (e.g. FOVs from "Search First" mode)
+    - Parallelized registration and fusion
 
     Args:
         zarr_url: Absolute path to the OME-Zarr image.
