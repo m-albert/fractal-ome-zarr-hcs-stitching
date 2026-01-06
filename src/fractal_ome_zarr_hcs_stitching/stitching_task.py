@@ -95,7 +95,6 @@ def stitching_task(
             runs out of memory during fusion, reduce this number.
             Default is 4.
     """
-    # Use the first of input_paths
     logger.info(f"{zarr_url=}")
 
     # Parse and log several NGFF-image metadata attributes
@@ -114,7 +113,11 @@ def stitching_task(
         f"{ngff_image_meta.get_pixel_sizes_zyx(level=1)}"
     )
 
+    # Load FOV ROI table
     fov_roi_table = ad.read_zarr(Path(zarr_url) / "tables/FOV_ROI_table").to_df()
+
+    # Set transform key for input tiles
+    # (in OME-Zarr version <= 0.5 there's a single transform key for input tiles)
     input_transform_key = "fractal_input"
 
     #############
@@ -124,14 +127,20 @@ def stitching_task(
     # Load FOVs for registration
     xim_well_reg = get_sim_from_multiscales(
         Path(zarr_url), resolution=registration_resolution_level
-    )  # could also be lower resolution
+    )
 
-    # determine whether to perform registration on maximum projection in Z
+    # Determine whether to perform registration on maximum projection in Z:
+    # Two cases:
+    # 1) User requested it via registration_on_z_proj=True
+    # 2) The data is 2D (size in z == 1)
     reg_max_project_z = registration_on_z_proj or xim_well_reg.sizes["z"] == 1
 
     if reg_max_project_z:
         xim_well_reg = xim_well_reg.max("z")
 
+    # Get individual tile images for registration
+    # (in the input data and xim_well_reg, the FOVs are subregions of a single
+    # array defined by fov_roi_table)
     msims_reg = get_tiles_from_sim(
         xim_well_reg, fov_roi_table, transform_key=input_transform_key
     )
@@ -177,6 +186,7 @@ def stitching_task(
                 )
             }
             for ip, p in enumerate(params)
+
             if not np.allclose(p.sel(t=0).data, np.eye(len(reg_spatial_dims) + 1))
         }
         logger.info(f"Obtained shifts: {shifts}")
@@ -192,23 +202,31 @@ def stitching_task(
     # Fusion
     ########
 
+    # If registration was performed at full resolution and without
+    # maximum projection in Z, we can reuse the loaded data for fusion.
+    # Otherwise, read full-resolution data for fusion
     if registration_resolution_level == 0 and not reg_max_project_z:
         xim_well = xim_well_reg
         msims_fusion = msims_reg
     else:
-        # Load the full-resolution image for fusion
         xim_well = get_sim_from_multiscales(Path(zarr_url), resolution=0)
         msims_fusion = get_tiles_from_sim(
             xim_well, fov_roi_table, transform_key=input_transform_key
         )
 
-    # assign the registration parameters to the tiles to be fused
+    # Assign the registration parameters to the tiles to be fused
+    # multiview-stitcher attaches the transformations obtained during registration
+    # to the tile objects. However, if registration was performed on different
+    # data (e.g. max projection in Z, or lower resolution), we need to
+    # reattach and/or broadcast the obtained transforms to the tile data to be fused.
     for itile in range(len(msims_fusion)):
+
+        # Get the affine transform from the registered tile used during registration
         affine = msi_utils.get_transform_from_msim(
             msims_reg[itile], fusion_transform_key
         )
 
-        # if the registration was performed on a maximum projection in Z, we need to
+        # If the registration was performed on a maximum projection in Z, we need to
         # broadcast the obtained affine parameters to 3D
         if reg_max_project_z:
             affine_3d = param_utils.identity_transform(
@@ -217,10 +235,12 @@ def stitching_task(
             affine_3d.loc[{pdim: affine.coords[pdim] for pdim in affine.dims}] = affine
             affine = affine_3d
 
+        # Set the affine transform for the tile to be fused
         msi_utils.set_affine_transform(
             msims_fusion[itile], affine, fusion_transform_key
         )
 
+    # Fusion input are single resolution spatial-images
     sims = [msi_utils.get_sim_from_msim(msim) for msim in msims_fusion]
     
     # If "t" not in input_dims, remove the dimension from sims before
@@ -228,19 +248,16 @@ def stitching_task(
     # multiview-stitcher currently adds and/or requires a (at least dummy) t dimension
     sims = [si_utils.sim_sel_coords(sim, sel_dict={'t': 0}) for sim in sims]
 
-    logger.info(f"Started fusion using transform key {fusion_transform_key}")
-
-
+    # Determine output zarr url
     well_url, old_img_path = _split_well_path_image_path(zarr_url)
-
     output_zarr_url = f"{well_url}/{zarr_url.split('/')[-1]}{output_group_suffix}"
     logger.info(f"Output fused path: {output_zarr_url}")
 
     # Fuse directly to zarr at highest resolution (level 0)
     # This writes only the full-resolution data without building a large dask graph
-    logger.info("Started fusion computation (direct to zarr)")
+    logger.info("Started fusion computation (writing directly to zarr)")
     logger.info(f"Using {fusion_n_jobs} parallel jobs.")
-    
+
     fused = fusion.fuse(
         sims,
         transform_key=fusion_transform_key,
@@ -250,7 +267,7 @@ def stitching_task(
         # fusion_func=fusion.max_fusion,
         output_zarr_url=f"{output_zarr_url}/0",
         zarr_options={
-            "ome_zarr": False,  # Don't create OME-Zarr metadata yet
+            "ome_zarr": False,  # Don't use multiview-stitcher to create OME-Zarr metadata
             "overwrite": True,
         },
         batch_options={
@@ -262,7 +279,7 @@ def stitching_task(
         },
     )
 
-    logger.info("Finished fusion computation")
+    logger.info("Finished fusion at full resolution")
     logger.info("Started building resolution pyramid")
 
     # Starting from on-disk full-resolution data, build and write to disk a
@@ -278,7 +295,7 @@ def stitching_task(
         open_array_kwargs={"write_empty_chunks": False, "fill_value": 0},
     )
 
-    # attach metadata to the fused image
+    # Attach OME-Zarr metadata to the fused image
     store = parse_url(output_zarr_url, mode="w").store
     output_group = zarr.group(store=store)
     writer.write_multiscales_metadata(
@@ -360,7 +377,7 @@ def stitching_task(
 
         return image_list_updates
 
-    logger.info("Done stitching")
+    logger.info("Done stitching.")
 
 
 if __name__ == "__main__":
