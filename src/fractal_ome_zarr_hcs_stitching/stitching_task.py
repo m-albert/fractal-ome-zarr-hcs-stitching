@@ -34,7 +34,7 @@ from fractal_ome_zarr_hcs_stitching.utils import (
     PreRegistrationPruningMethod,
     StitchingChannelInputModel,
     get_sim_from_multiscales,
-    get_tiles_from_sim,
+    get_fov_sims_from_well_sim,
 )
 
 logger = logging.getLogger(__name__)
@@ -83,7 +83,7 @@ def stitching_task(
         registration_on_z_proj: Whether to perform registration on a maximum
             projection along z in case of 3D data.
         pre_registration_pruning_method: Method to use for selecting a subset
-            of all overlapping tiles for pairwise registration. By default,
+            of all overlapping FOVs/tiles for pairwise registration. By default,
             only lower, upper, right and left neighbors are considered. Set
             this parameter to no_pruning if pairs of tiles which deviate
             from this pattern need to be registered.
@@ -143,9 +143,12 @@ def stitching_task(
     # Get individual tile images for registration
     # (in the input data and xim_well_reg, the FOVs are subregions of a single
     # array defined by fov_roi_table)
-    msims_reg = get_tiles_from_sim(
+    sims_reg = get_fov_sims_from_well_sim(
         xim_well_reg, fov_roi_table, transform_key=input_transform_key
     )
+
+    # Registration expects multiscale spatial images as input
+    msims_reg = [msi_utils.get_msim_from_sim(sim, scale_factors=[]) for sim in sims_reg]
 
     reg_spatial_dims = si_utils.get_spatial_dims_from_sim(
         xim_well_reg.squeeze(drop=True)
@@ -166,7 +169,7 @@ def stitching_task(
 
     # Perform the actual registration
     # Try-except block to catch NotEnoughOverlapError in case no overlapping
-    # tiles are found for registration. If that happens, we skip registration
+    # FOVs are found for registration. If that happens, we skip registration
     # and directly proceed to fusion
     try:
         fusion_transform_key = "translation_registered"
@@ -194,7 +197,7 @@ def stitching_task(
         logger.info(f"Obtained shifts: {shifts}")
     except NotEnoughOverlapError:
         logger.warning(
-            "Did not find overlapping tiles for stitching. Skipping registration."
+            "Did not find overlapping FOVs for stitching. Skipping registration."
         )
         fusion_transform_key = input_transform_key
 
@@ -209,19 +212,19 @@ def stitching_task(
     # Otherwise, read full-resolution data for fusion
     if registration_resolution_level == 0 and not reg_max_project_z:
         xim_well = xim_well_reg
-        msims_fusion = msims_reg
+        sims_fusion = [msi_utils.get_sim_from_msim(msim) for msim in msims_reg]
     else:
         xim_well = get_sim_from_multiscales(Path(zarr_url), resolution=0)
-        msims_fusion = get_tiles_from_sim(
+        sims_fusion = get_fov_sims_from_well_sim(
             xim_well, fov_roi_table, transform_key=input_transform_key
         )
 
-    # Assign the registration parameters to the tiles to be fused
+    # Assign the registration parameters to the FOVs to be fused
     # multiview-stitcher attaches the transformations obtained during registration
     # to the tile objects. However, if registration was performed on different
     # data (e.g. max projection in Z, or lower resolution), we need to
     # reattach and/or broadcast the obtained transforms to the tile data to be fused.
-    for itile in range(len(msims_fusion)):
+    for itile in range(len(sims_fusion)):
 
         # Get the affine transform from the registered tile used during registration
         affine = msi_utils.get_transform_from_msim(
@@ -238,17 +241,14 @@ def stitching_task(
             affine = affine_3d
 
         # Set the affine transform for the tile to be fused
-        msi_utils.set_affine_transform(
-            msims_fusion[itile], affine, fusion_transform_key
+        si_utils.set_sim_affine(
+            sims_fusion[itile], affine, fusion_transform_key
         )
-
-    # Fusion input are single resolution spatial-images
-    sims = [msi_utils.get_sim_from_msim(msim) for msim in msims_fusion]
     
     # If "t" not in input_dims, remove the dimension from sims before
     # fusion to avoid writing t dim to zarr:
     # multiview-stitcher currently adds and/or requires a (at least dummy) t dimension
-    sims = [si_utils.sim_sel_coords(sim, sel_dict={'t': 0}) for sim in sims]
+    sims_fusion = [si_utils.sim_sel_coords(sim, sel_dict={'t': 0}) for sim in sims_fusion]
 
     # Determine output zarr url
     well_url, old_img_path = _split_well_path_image_path(zarr_url)
@@ -261,11 +261,11 @@ def stitching_task(
     logger.info(f"Using {fusion_n_jobs} parallel jobs.")
 
     fused = fusion.fuse(
-        sims,
+        sims_fusion,
         transform_key=fusion_transform_key,
-        output_chunksize={dim: sims[0].data.chunksize[idim]
-                          for idim, dim in enumerate(sims[0].dims)},
-        output_spacing=si_utils.get_spacing_from_sim(sims[0]),
+        output_chunksize={dim: sims_fusion[0].data.chunksize[idim]
+                          for idim, dim in enumerate(sims_fusion[0].dims)},
+        output_spacing=si_utils.get_spacing_from_sim(sims_fusion[0]),
         # fusion_func=fusion.max_fusion,
         output_zarr_url=f"{output_zarr_url}/0",
         zarr_options={
@@ -292,7 +292,7 @@ def stitching_task(
         zarrurl=output_zarr_url,
         overwrite=True,
         num_levels=ngff_image_meta.num_levels,
-        chunksize=sims[0].data.chunksize,
+        chunksize=sims_fusion[0].data.chunksize,
         coarsening_xy=ngff_image_meta.coarsening_xy,
         open_array_kwargs={"write_empty_chunks": False, "fill_value": 0},
     )

@@ -61,12 +61,12 @@ def get_sim_from_multiscales(
     return sim
 
 
-def get_tiles_from_sim(
+def get_fov_sims_from_well_sim(
     xim_well,
     fov_roi_table: pd.DataFrame,
     transform_key: str = "fractal_input",
 ):
-    """Get tiles as multiscale spatial images from a well spatial image
+    """Get FOV spatial images from a well spatial image
     and a (Fractal) FOV ROI table.
 
     Parameters
@@ -78,10 +78,10 @@ def get_tiles_from_sim(
 
     Returns:
     -------
-    list of multiscale_spatial_image (multiview-stitcher flavor)
+    list of spatial-images (multiview-stitcher flavor)
     """
     input_spatial_dims = [dim for dim in xim_well.dims if dim in ["z", "y", "x"]]
-    msims = []
+    fov_sims = []
     for _, row in fov_roi_table.iterrows():
         origin = {dim: row[f"{dim}_micrometer"] for dim in input_spatial_dims}
         extent = {dim: row[f"len_{dim}_micrometer"] for dim in input_spatial_dims}
@@ -107,11 +107,9 @@ def get_tiles_from_sim(
             transform_key=transform_key,
         )
 
-        msim = msi_utils.get_msim_from_sim(sim, scale_factors=[])
+        fov_sims.append(sim)
 
-        msims.append(msim)
-
-    return msims
+    return fov_sims
 
 
 class StitchingChannelInputModel(ChannelInputModel):
