@@ -97,7 +97,19 @@
             ],
             "default": "keep_axis_aligned",
             "title": "Pre Registration Pruning Method",
-            "description": "Method to use for selecting a subset of all overlapping tiles for pairwise registration. By default, only lower, upper, right and left neighbors are considered. Set this parameter to no_pruning if pairs of tiles which deviate from this pattern need to be registered."
+            "description": "Method to use for selecting a subset of all overlapping FOVs/tiles for pairwise registration. By default, only lower, upper, right and left neighbors are considered. Set this parameter to no_pruning if pairs of tiles which deviate from this pattern need to be registered."
+          },
+          "registration_n_jobs": {
+            "default": 16,
+            "title": "Registration N Jobs",
+            "type": "integer",
+            "description": "Number of parallel pairwise registrations to run. Setting this is specifically useful for limiting memory usage. If the task runs out of memory during registration, reduce this number. Default is 16."
+          },
+          "fusion_n_jobs": {
+            "default": 16,
+            "title": "Fusion N Jobs",
+            "type": "integer",
+            "description": "Number of parallel jobs to use for fusion to zarr. Uses joblib for parallelization. It makes sense to set this to the number of cores available to the task. If the task runs out of memory during fusion, reduce this number. Default is 16."
           }
         },
         "required": [
@@ -107,7 +119,7 @@
         "type": "object",
         "title": "StitchingTask"
       },
-      "docs_info": "## stitching_task\nStitches FOVs from an OME-Zarr image.\n\nPerforms registration and fusion of FOVs indicated\nin the FOV_ROI_table of the OME-Zarr image. Writes the\nfused image back to a \"fused\" group in the same Zarr array.\n\nTodo:\n  - include and update output metadata / FOV ROI table\n  - test 2D / 3D\n  - optimize for large data\n  - currently optimized for search first mode, need to implement\n    registration pair finding for \"grid\" (?) mode\n",
+      "docs_info": "## stitching_task\nStitches fields of view (FOV) in an OME-Zarr image.\n\nRegisters and fuses FOVs specified in the Fractal FOV_ROI_table.\nWrites the fused image back to a group within the same OME-Zarr image.\n\nFeatures:\n- Input can be 2D or 3D\n- Registration is performed\n  - on a specified resolution level\n  - on a specified channel\n  - optionally on a maximum projection for 3D data\n- Supports large data with low memory consumption\n- Supports regular and irregular FOV layouts (e.g. FOVs from \"Search First\" mode)\n- Parallelized registration and fusion\n",
       "docs_link": "https://github.com/m-albert/fractal-ome-zarr-hcs-stitching"
     }
   ],
