@@ -31,7 +31,7 @@ dependencies = [
     "anndata",
     "ome-zarr",
     "joblib",
-    "xarray < 2025.5",
+    "xarray",
     ]
 
 # Optional dependencies (e.g. for `pip install -e ".[dev]"`, see
