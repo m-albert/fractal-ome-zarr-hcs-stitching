@@ -273,7 +273,7 @@ def stitching_task(
         },
         batch_options={
             "batch_func": misc_utils.process_batch_using_joblib,
-            "n_batch": 1000, # num of chunks to schedule at once in joblib
+            "n_batch": 1000,  # num of chunks to schedule at once in joblib
             "batch_func_kwargs": {
                 "n_jobs": fusion_n_jobs,
             },
