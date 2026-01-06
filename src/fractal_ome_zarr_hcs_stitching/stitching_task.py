@@ -144,24 +144,26 @@ def stitching_task(
     logger.info(f"Registration res level: {registration_resolution_level}")
     logger.info(f"Registration spatial dims: {reg_spatial_dims}")
 
-    # Find channel index
+    # Make sure the requested channel is available in the OME-Zarr image
     omero_channel = channel.get_omero_channel(zarr_url)
-    if omero_channel:
-        reg_channel_index = omero_channel.index
-    else:
+    if omero_channel is None:
         logger.info(
             f"Skipping stitching for {zarr_url} because {channel} is "
             "not available in that OME-Zarr image"
         )
         return
 
+    # Perform the actual registration
+    # Try-except block to catch NotEnoughOverlapError in case no overlapping
+    # tiles are found for registration. If that happens, we skip registration
+    # and directly proceed to fusion
     try:
         fusion_transform_key = "translation_registered"
         params = registration.register(
             msims_reg,
             transform_key=input_transform_key,
             new_transform_key=fusion_transform_key,
-            reg_channel_index=reg_channel_index,
+            reg_channel=omero_channel.label,
             registration_binning={dim: 1 for dim in reg_spatial_dims},
             pre_registration_pruning_method=pre_registration_pruning_method.get_pruning_method(),
             n_parallel_pairwise_regs=registration_n_jobs,
