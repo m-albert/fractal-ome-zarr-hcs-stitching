@@ -244,7 +244,6 @@ def stitching_task(
         si_utils.set_sim_affine(
             sims_fusion[itile], affine, fusion_transform_key
         )
-    
     # If "t" not in input_dims, remove the dimension from sims before
     # fusion to avoid writing t dim to zarr:
     # multiview-stitcher currently adds and/or requires a (at least dummy) t dimension
