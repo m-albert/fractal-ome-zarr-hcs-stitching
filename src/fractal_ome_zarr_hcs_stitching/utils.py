@@ -66,7 +66,8 @@ def get_tiles_from_sim(
     fov_roi_table: pd.DataFrame,
     transform_key: str = "fractal_input",
 ):
-    """_summary_
+    """Get tiles as multiscale spatial images from a well spatial image
+    and a (Fractal) FOV ROI table.
 
     Parameters
     ----------
