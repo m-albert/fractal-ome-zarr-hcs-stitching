@@ -18,7 +18,6 @@
         "2D",
         "3D"
       ],
-      "type": "parallel",
       "executable_parallel": "stitching_task.py",
       "meta_parallel": {
         "cpus_per_task": 1,
@@ -41,11 +40,13 @@
             "properties": {
               "wavelength_id": {
                 "title": "Wavelength Id",
-                "type": "string"
+                "type": "string",
+                "description": "Unique ID for the channel wavelength, e.g. `A01_C01`. Can only be specified if label is not set."
               },
               "label": {
                 "title": "Label",
-                "type": "string"
+                "type": "string",
+                "description": "Name of the channel. Can only be specified if wavelength_id is not set."
               }
             },
             "title": "StitchingChannelInputModel",
@@ -96,7 +97,7 @@
             ],
             "default": "keep_axis_aligned",
             "title": "Pre Registration Pruning Method",
-            "description": "Method to use for selecting a subset of all overlapping tiles for pairwise registration. By default, only lower, upper, right and left neighbors are considered. Set this parameter to no_pruning if pairs of tiles which deviate from this pattern need to be registered."
+            "description": "Method to use for selecting a subset of all overlapping FOVs/tiles for pairwise registration. By default, only lower, upper, right and left neighbors are considered. Set this parameter to no_pruning if pairs of tiles which deviate from this pattern need to be registered."
           },
           "registration_n_jobs": {
             "default": 16,
@@ -118,7 +119,8 @@
         "type": "object",
         "title": "StitchingTask"
       },
-      "docs_info": "## stitching_task\nStitches FOVs from an OME-Zarr image.\n\nPerforms registration and fusion of FOVs indicated\nin the FOV_ROI_table of the OME-Zarr image. Writes the\nfused image back to a \"fused\" group in the same Zarr array.\n\nTodo:\n  - include and update output metadata / FOV ROI table\n  - test 2D / 3D\n  - optimize for large data\n  - currently optimized for search first mode, need to implement\n    registration pair finding for \"grid\" (?) mode\n"
+      "docs_info": "## stitching_task\nStitches fields of view (FOV) in an OME-Zarr image.\n\nRegisters and fuses FOVs specified in the Fractal FOV_ROI_table.\nWrites the fused image back to a group within the same OME-Zarr image.\n\nFeatures:\n- Input can be 2D or 3D\n- Registration is performed\n  - on a specified resolution level\n  - on a specified channel\n  - optionally on a maximum projection for 3D data\n- Supports large data with low memory consumption\n- Supports regular and irregular FOV layouts (e.g. FOVs from \"Search First\" mode)\n- Parallelized registration and fusion\n",
+      "docs_link": "https://github.com/m-albert/fractal-ome-zarr-hcs-stitching"
     }
   ],
   "has_args_schemas": true,
