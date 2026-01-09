@@ -43,17 +43,8 @@ jobs:
       - name: Install package & testing extras
         run: python -m pip install -e ".[dev]"
 
-      - name: Regenerate the manifest
-        run: python src/fractal_ome_zarr_hcs_stitching/dev/create_manifest.py
-
       - name: Check if manifest has changed
-        run: |
-          if [ -n "$(git diff --exit-code ./src/fractal_ome_zarr_hcs_stitching/__FRACTAL_MANIFEST__.json)" ]; then
-          echo "__FRACTAL_MANIFEST__.json has changed. Please run 'python src/fractal_ome_zarr_hcs_stitching/dev/create_manifest.py' and commit the changes."
-            exit 1
-          else
-            echo "__FRACTAL_MANIFEST__.json has not changed."
-          fi
+        run: fractal-manifest check --package fractal-ome-zarr-hcs-stitching
 
       - name: Cache Pooch folder
         id: cache-pooch-folder

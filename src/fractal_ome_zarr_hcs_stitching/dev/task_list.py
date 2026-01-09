@@ -1,7 +1,12 @@
 """Contains the list of tasks available to fractal."""
 
-from fractal_tasks_core.dev.task_models import ParallelTask
+from fractal_task_tools.task_models import ParallelTask
 
+AUTHORS = "Marvin Albert, Joel Luethi, Nicole Repina"
+DOCS_LINK = "https://github.com/m-albert/fractal-ome-zarr-hcs-stitching"
+INPUT_MODELS = [
+    ["fractal_ome_zarr_hcs_stitching", "utils.py", "StitchingChannelInputModel"],
+]
 TASK_LIST = [
     ParallelTask(
         name="Stitching Task",
