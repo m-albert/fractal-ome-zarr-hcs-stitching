@@ -17,7 +17,13 @@ from fractal_tasks_core.tasks._zarr_utils import (
     _split_well_path_image_path,
     _update_well_metadata,
 )
-from multiview_stitcher import fusion, msi_utils, param_utils, registration
+from multiview_stitcher import (
+    fusion,
+    misc_utils,
+    msi_utils,
+    param_utils,
+    registration,
+)
 from multiview_stitcher import spatial_image_utils as si_utils
 from multiview_stitcher.mv_graph import NotEnoughOverlapError
 from ome_zarr import writer
@@ -28,7 +34,7 @@ from fractal_ome_zarr_hcs_stitching.utils import (
     PreRegistrationPruningMethod,
     StitchingChannelInputModel,
     get_sim_from_multiscales,
-    get_tiles_from_sim,
+    get_fov_sims_from_well_sim,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,19 +50,23 @@ def stitching_task(
     registration_resolution_level: int = 0,
     registration_on_z_proj: bool = True,
     pre_registration_pruning_method: PreRegistrationPruningMethod = PreRegistrationPruningMethod.KEEPAXISALIGNED,  # noqa: E501
+    registration_n_jobs: int = 16,
+    fusion_n_jobs: int = 16,
 ) -> None:
-    """Stitches FOVs from an OME-Zarr image.
+    """Stitches fields of view (FOV) in an OME-Zarr image.
 
-    Performs registration and fusion of FOVs indicated
-    in the FOV_ROI_table of the OME-Zarr image. Writes the
-    fused image back to a "fused" group in the same Zarr array.
+    Registers and fuses FOVs specified in the Fractal FOV_ROI_table.
+    Writes the fused image back to a group within the same OME-Zarr image.
 
-    Todo:
-      - include and update output metadata / FOV ROI table
-      - test 2D / 3D
-      - optimize for large data
-      - currently optimized for search first mode, need to implement
-        registration pair finding for "grid" (?) mode
+    Features:
+    - Input can be 2D or 3D
+    - Registration is performed
+      - on a specified resolution level
+      - on a specified channel
+      - optionally on a maximum projection for 3D data
+    - Supports large data with low memory consumption
+    - Supports regular and irregular FOV layouts (e.g. FOVs from "Search First" mode)
+    - Parallelized registration and fusion
 
     Args:
         zarr_url: Absolute path to the OME-Zarr image.
@@ -73,12 +83,20 @@ def stitching_task(
         registration_on_z_proj: Whether to perform registration on a maximum
             projection along z in case of 3D data.
         pre_registration_pruning_method: Method to use for selecting a subset
-            of all overlapping tiles for pairwise registration. By default,
+            of all overlapping FOVs/tiles for pairwise registration. By default,
             only lower, upper, right and left neighbors are considered. Set
             this parameter to no_pruning if pairs of tiles which deviate
             from this pattern need to be registered.
+        registration_n_jobs: Number of parallel pairwise registrations to run.
+            Setting this is specifically useful for limiting memory usage.
+            If the task runs out of memory during registration, reduce this number.
+            Default is 16.
+        fusion_n_jobs: Number of parallel jobs to use for fusion to zarr.
+            Uses joblib for parallelization. It makes sense to set
+            this to the number of cores available to the task. If the task
+            runs out of memory during fusion, reduce this number.
+            Default is 16.
     """
-    # Use the first of input_paths
     logger.info(f"{zarr_url=}")
 
     # Parse and log several NGFF-image metadata attributes
@@ -97,7 +115,11 @@ def stitching_task(
         f"{ngff_image_meta.get_pixel_sizes_zyx(level=1)}"
     )
 
+    # Load FOV ROI table
     fov_roi_table = ad.read_zarr(Path(zarr_url) / "tables/FOV_ROI_table").to_df()
+
+    # Set transform key for input tiles
+    # (in OME-Zarr version <= 0.5 there's a single transform key for input tiles)
     input_transform_key = "fractal_input"
 
     #############
@@ -107,21 +129,26 @@ def stitching_task(
     # Load FOVs for registration
     xim_well_reg = get_sim_from_multiscales(
         Path(zarr_url), resolution=registration_resolution_level
-    )  # could also be lower resolution
-
-    input_spatial_dims = si_utils.get_spatial_dims_from_sim(
-        xim_well_reg.squeeze(drop=True)
     )
 
-    # determine whether to perform registration on maximum projection in Z
-    reg_max_project_z = registration_on_z_proj and ("z" in input_spatial_dims)
+    # Determine whether to perform registration on maximum projection in Z:
+    # Two cases:
+    # 1) User requested it via registration_on_z_proj=True
+    # 2) The data is 2D (size in z == 1)
+    reg_max_project_z = registration_on_z_proj or xim_well_reg.sizes["z"] == 1
 
     if reg_max_project_z:
         xim_well_reg = xim_well_reg.max("z")
 
-    msims_reg = get_tiles_from_sim(
+    # Get individual tile images for registration
+    # (in the input data and xim_well_reg, the FOVs are subregions of a single
+    # array defined by fov_roi_table)
+    sims_reg = get_fov_sims_from_well_sim(
         xim_well_reg, fov_roi_table, transform_key=input_transform_key
     )
+
+    # Registration expects multiscale spatial images as input
+    msims_reg = [msi_utils.get_msim_from_sim(sim, scale_factors=[]) for sim in sims_reg]
 
     reg_spatial_dims = si_utils.get_spatial_dims_from_sim(
         xim_well_reg.squeeze(drop=True)
@@ -131,26 +158,29 @@ def stitching_task(
     logger.info(f"Registration res level: {registration_resolution_level}")
     logger.info(f"Registration spatial dims: {reg_spatial_dims}")
 
-    # Find channel index
+    # Make sure the requested channel is available in the OME-Zarr image
     omero_channel = channel.get_omero_channel(zarr_url)
-    if omero_channel:
-        reg_channel_index = omero_channel.index
-    else:
+    if omero_channel is None:
         logger.info(
             f"Skipping stitching for {zarr_url} because {channel} is "
             "not available in that OME-Zarr image"
         )
         return
 
+    # Perform the actual registration
+    # Try-except block to catch NotEnoughOverlapError in case no overlapping
+    # FOVs are found for registration. If that happens, we skip registration
+    # and directly proceed to fusion
     try:
         fusion_transform_key = "translation_registered"
         params = registration.register(
             msims_reg,
             transform_key=input_transform_key,
             new_transform_key=fusion_transform_key,
-            reg_channel_index=reg_channel_index,
+            reg_channel=omero_channel.label,
             registration_binning={dim: 1 for dim in reg_spatial_dims},
             pre_registration_pruning_method=pre_registration_pruning_method.get_pruning_method(),
+            n_parallel_pairwise_regs=registration_n_jobs,
         )
         shifts = {
             ip: {
@@ -161,12 +191,13 @@ def stitching_task(
                 )
             }
             for ip, p in enumerate(params)
+
             if not np.allclose(p.sel(t=0).data, np.eye(len(reg_spatial_dims) + 1))
         }
         logger.info(f"Obtained shifts: {shifts}")
     except NotEnoughOverlapError:
         logger.warning(
-            "Did not find overlapping tiles for stitching. Skipping registration."
+            "Did not find overlapping FOVs for stitching. Skipping registration."
         )
         fusion_transform_key = input_transform_key
 
@@ -176,23 +207,31 @@ def stitching_task(
     # Fusion
     ########
 
+    # If registration was performed at full resolution and without
+    # maximum projection in Z, we can reuse the loaded data for fusion.
+    # Otherwise, read full-resolution data for fusion
     if registration_resolution_level == 0 and not reg_max_project_z:
         xim_well = xim_well_reg
-        msims_fusion = msims_reg
+        sims_fusion = [msi_utils.get_sim_from_msim(msim) for msim in msims_reg]
     else:
-        # Load the full-resolution image for fusion
         xim_well = get_sim_from_multiscales(Path(zarr_url), resolution=0)
-        msims_fusion = get_tiles_from_sim(
+        sims_fusion = get_fov_sims_from_well_sim(
             xim_well, fov_roi_table, transform_key=input_transform_key
         )
 
-    # assign the registration parameters to the tiles to be fused
-    for itile in range(len(msims_fusion)):
+    # Assign the registration parameters to the FOVs to be fused
+    # multiview-stitcher attaches the transformations obtained during registration
+    # to the tile objects. However, if registration was performed on different
+    # data (e.g. max projection in Z, or lower resolution), we need to
+    # reattach and/or broadcast the obtained transforms to the tile data to be fused.
+    for itile in range(len(sims_fusion)):
+
+        # Get the affine transform from the registered tile used during registration
         affine = msi_utils.get_transform_from_msim(
             msims_reg[itile], fusion_transform_key
         )
 
-        # if the registration was performed on a maximum projection in Z, we need to
+        # If the registration was performed on a maximum projection in Z, we need to
         # broadcast the obtained affine parameters to 3D
         if reg_max_project_z:
             affine_3d = param_utils.identity_transform(
@@ -201,70 +240,47 @@ def stitching_task(
             affine_3d.loc[{pdim: affine.coords[pdim] for pdim in affine.dims}] = affine
             affine = affine_3d
 
-        msi_utils.set_affine_transform(
-            msims_fusion[itile], affine, fusion_transform_key
+        # Set the affine transform for the tile to be fused
+        si_utils.set_sim_affine(
+            sims_fusion[itile], affine, fusion_transform_key
         )
+    # If "t" not in input_dims, remove the dimension from sims before
+    # fusion to avoid writing t dim to zarr:
+    # multiview-stitcher currently adds and/or requires a (at least dummy) t dimension
+    sims_fusion = [si_utils.sim_sel_coords(sim, sel_dict={'t': 0}) for sim in sims_fusion]
 
-    sims = [msi_utils.get_sim_from_msim(msim) for msim in msims_fusion]
-    sdims = si_utils.get_spatial_dims_from_sim(xim_well)
-    ndim = len(sdims)
-
-    logger.info(f"Started fusion using transform key {fusion_transform_key}")
-
-    output_chunksize = {
-        dim: xim_well.data.chunksize[(-ndim + idim)] for idim, dim in enumerate(sdims)
-    }
-    logger.info(f"Output chunksize: {output_chunksize}")
-    logger.info("Started building fusion graph")
-
-    fused = fusion.fuse(
-        sims,
-        transform_key=fusion_transform_key,
-        output_chunksize=output_chunksize,
-        output_spacing=si_utils.get_spacing_from_sim(sims[0]),
-        # fusion_func=fusion.max_fusion,
-    )
-
-    fused = fused.sel(t=0, drop=True)
-
-    if "z" not in fused.dims:
-        fused = fused.expand_dims("z", xim_well.dims.index("z"))
-
-    # get the dask array from the fused sim
-    fused_da = fused.sel({"c": fused.coords["c"].values}).data
-
-    logger.info("Finished building fusion graph")
-
+    # Determine output zarr url
     well_url, old_img_path = _split_well_path_image_path(zarr_url)
-
     output_zarr_url = f"{well_url}/{zarr_url.split('/')[-1]}{output_group_suffix}"
     logger.info(f"Output fused path: {output_zarr_url}")
 
-    # Open output array. This allows setting `write_empty_chunks=True`,
-    # which cannot be passed to dask.array.to_zarr below.
-    output_zarr_arr = zarr.open(
-        f"{output_zarr_url}/0",
-        shape=fused_da.shape,
-        chunks=fused_da.chunksize,
-        dtype=fused_da.dtype,
-        write_empty_chunks=False,
-        dimension_separator="/",
-        fill_value=0,
-        mode="w",
+    # Fuse directly to zarr at highest resolution (level 0)
+    # This writes only the full-resolution data without building a large dask graph
+    logger.info("Started fusion computation (writing directly to zarr)")
+    logger.info(f"Using {fusion_n_jobs} parallel jobs.")
+
+    fused = fusion.fuse(
+        sims_fusion,
+        transform_key=fusion_transform_key,
+        output_chunksize={dim: sims_fusion[0].data.chunksize[idim]
+                          for idim, dim in enumerate(sims_fusion[0].dims)},
+        output_spacing=si_utils.get_spacing_from_sim(sims_fusion[0]),
+        # fusion_func=fusion.max_fusion,
+        output_zarr_url=f"{output_zarr_url}/0",
+        zarr_options={
+            "ome_zarr": False,  # Don't use multiview-stitcher to create OME-Zarr metadata
+            "overwrite": True,
+        },
+        batch_options={
+            "batch_func": misc_utils.process_batch_using_joblib,
+            "n_batch": 1000,  # num of chunks to schedule at once in joblib
+            "batch_func_kwargs": {
+                "n_jobs": fusion_n_jobs,
+            },
+        },
     )
 
-    logger.info("Started fusion computation")
-
-    # Write the fused array back to the same full-resolution Zarr array
-    fused_da.to_zarr(
-        output_zarr_arr,
-        overwrite=True,
-        dimension_separator="/",
-        return_stored=False,
-        compute=True,
-    )
-
-    logger.info("Finished fusion computation")
+    logger.info("Finished fusion at full resolution")
     logger.info("Started building resolution pyramid")
 
     # Starting from on-disk full-resolution data, build and write to disk a
@@ -275,12 +291,12 @@ def stitching_task(
         zarrurl=output_zarr_url,
         overwrite=True,
         num_levels=ngff_image_meta.num_levels,
-        chunksize=xim_well.data.chunksize,
+        chunksize=sims_fusion[0].data.chunksize,
         coarsening_xy=ngff_image_meta.coarsening_xy,
         open_array_kwargs={"write_empty_chunks": False, "fill_value": 0},
     )
 
-    # attach metadata to the fused image
+    # Attach OME-Zarr metadata to the fused image
     store = parse_url(output_zarr_url, mode="w").store
     output_group = zarr.group(store=store)
     writer.write_multiscales_metadata(
@@ -321,7 +337,7 @@ def stitching_task(
         .coordinateTransformations[0]
         .scale[-3:]
     )
-    image_ROI_table = get_single_image_ROI(fused_da.shape, pixels_ZYX=pixels_ZYX)
+    image_ROI_table = get_single_image_ROI(fused.data.shape, pixels_ZYX=pixels_ZYX)
     write_table(
         output_group,
         "well_ROI_table",  # Could also be image_ROI_table
@@ -362,7 +378,7 @@ def stitching_task(
 
         return image_list_updates
 
-    logger.info("Done stitching")
+    logger.info("Done stitching.")
 
 
 if __name__ == "__main__":

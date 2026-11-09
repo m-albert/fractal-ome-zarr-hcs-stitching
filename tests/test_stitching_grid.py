@@ -4,6 +4,10 @@ from fractal_ome_zarr_hcs_stitching.stitching_task import stitching_task
 from fractal_ome_zarr_hcs_stitching.utils import StitchingChannelInputModel
 
 
+TESTING_REGISTRATION_N_JOBS = 16
+TESTING_FUSION_N_JOBS = 16
+
+
 @pytest.mark.parametrize(
     "registration_resolution_level",
     [res_level for res_level in [0, 1]],
@@ -16,6 +20,8 @@ def test_stitching_2d_grid(
         zarr_url=tiled_ome_zarr_2d,
         channel=StitchingChannelInputModel(wavelength_id="A02_C01"),
         registration_resolution_level=registration_resolution_level,
+        registration_n_jobs=TESTING_REGISTRATION_N_JOBS,
+        fusion_n_jobs=TESTING_FUSION_N_JOBS,
     )
     expected_image_list_updates = {
         "image_list_updates": [
