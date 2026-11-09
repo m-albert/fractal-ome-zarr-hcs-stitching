@@ -94,6 +94,16 @@ def stitching_task(
     logger.info(f"  Pyramid levels: {ome_zarr_container.level_paths}")
     logger.info(f"  Full-resolution pixel size: {input_image.pixel_size}")
 
+    # Make sure the requested channel is available in the OME-Zarr image.
+    # Checked first, so that images without it are skipped before any work.
+    reg_channel_label = channel.get_channel_label(ome_zarr_container)
+    if reg_channel_label is None:
+        logger.info(
+            f"Skipping stitching for {zarr_url} because {channel} is "
+            "not available in that OME-Zarr image"
+        )
+        return
+
     # Load FOV ROI table
     fov_roi_table = ome_zarr_container.get_roi_table("FOV_ROI_table").dataframe
 
@@ -138,15 +148,6 @@ def stitching_task(
     logger.info("Started registration")
     logger.info(f"Registration res level: {registration_resolution_level}")
     logger.info(f"Registration spatial dims: {reg_spatial_dims}")
-
-    # Make sure the requested channel is available in the OME-Zarr image
-    reg_channel_label = channel.get_channel_label(ome_zarr_container)
-    if reg_channel_label is None:
-        logger.info(
-            f"Skipping stitching for {zarr_url} because {channel} is "
-            "not available in that OME-Zarr image"
-        )
-        return
 
     # Perform the actual registration
     # Try-except block to catch NotEnoughOverlapError in case no overlapping
