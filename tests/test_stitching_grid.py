@@ -4,8 +4,9 @@ from fractal_ome_zarr_hcs_stitching.stitching_task import stitching_task
 from fractal_ome_zarr_hcs_stitching.utils import StitchingChannelInputModel
 
 
-TESTING_REGISTRATION_N_JOBS = 16
-TESTING_FUSION_N_JOBS = 16
+# Hosted CI runners have 3-4 CPUs: more parallel jobs only add overhead
+TESTING_REGISTRATION_N_JOBS = 4
+TESTING_FUSION_N_JOBS = 4
 
 
 @pytest.mark.parametrize(

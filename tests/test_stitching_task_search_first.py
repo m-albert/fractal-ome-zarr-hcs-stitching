@@ -5,8 +5,9 @@ from fractal_ome_zarr_hcs_stitching.stitching_task import stitching_task
 from fractal_ome_zarr_hcs_stitching.utils import StitchingChannelInputModel
 
 
-TESTING_REGISTRATION_N_JOBS = 16
-TESTING_FUSION_N_JOBS = 16
+# Hosted CI runners have 3-4 CPUs: more parallel jobs only add overhead
+TESTING_REGISTRATION_N_JOBS = 4
+TESTING_FUSION_N_JOBS = 4
 
 
 def test_stitching_3d_search_first(
@@ -19,6 +20,8 @@ def test_stitching_3d_search_first(
         channel=StitchingChannelInputModel(wavelength_id="A04_C01"),
         registration_resolution_level=registration_resolution_level,
         registration_on_z_proj=registration_on_z_proj,
+        registration_n_jobs=TESTING_REGISTRATION_N_JOBS,
+        fusion_n_jobs=TESTING_FUSION_N_JOBS,
     )
     expected_image_list_updates = {
         "image_list_updates": [
