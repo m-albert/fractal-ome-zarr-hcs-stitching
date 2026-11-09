@@ -17,6 +17,7 @@ def get_sim_from_ome_zarr_container(
     ome_zarr_container: OmeZarrContainer,
     resolution: int = 0,
     transform_key: str = "fractal_input",
+    as_dask: bool = False,
 ):
     """Get a spatial image representing a given resolution level of an image.
 
@@ -28,6 +29,11 @@ def get_sim_from_ome_zarr_container(
         Resolution level index, by default 0
     transform_key : str, optional
         Transform key to attach the (identity) input transform to.
+    as_dask : bool, optional
+        Back the spatial image by a dask array instead of the zarr array.
+        Needed for reductions such as `.max("z")`, which are computed eagerly
+        (i.e. load the whole array) on zarr-backed spatial images.
+        By default False.
 
     Returns:
     -------
@@ -41,7 +47,10 @@ def get_sim_from_ome_zarr_container(
     pixel_size = image.pixel_size
 
     return si_utils.get_sim_from_array(
-        image.get_as_dask(),
+        # By default pass the zarr array directly: multiview-stitcher then
+        # reads only the regions it needs, and passes compact references to
+        # the zarr array (instead of dask graphs) to parallel fusion workers
+        image.get_as_dask() if as_dask else image.zarr_array,
         dims=axes,
         # multiview-stitcher identifies channels by their `c` coordinate,
         # so channel labels are used (they must be unique within the image)
@@ -90,7 +99,9 @@ def get_fov_sims_from_well_sim(
         )
 
         sim = si_utils.get_sim_from_array(
-            tile.data,
+            # Pass the DataArray, not `tile.data`: for zarr-backed tiles,
+            # `.data` would load the tile into memory
+            tile,
             dims=tile.dims,
             c_coords=xim_well.coords["c"].data,
             scale=si_utils.get_spacing_from_sim(tile),

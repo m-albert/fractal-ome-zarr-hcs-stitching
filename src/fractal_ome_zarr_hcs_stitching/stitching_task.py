@@ -117,18 +117,23 @@ def stitching_task(
     # Registration
     ##############
 
-    # Load FOVs for registration
-    xim_well_reg = get_sim_from_ome_zarr_container(
-        ome_zarr_container,
-        resolution=registration_resolution_level,
-        transform_key=input_transform_key,
-    )
-
     # Determine whether to perform registration on maximum projection in Z:
     # Two cases:
     # 1) User requested it via registration_on_z_proj=True
     # 2) The data is 2D (size in z == 1)
-    reg_max_project_z = registration_on_z_proj or xim_well_reg.sizes["z"] == 1
+    reg_max_project_z = (
+        registration_on_z_proj or input_image.dimensions.get("z") == 1
+    )
+
+    # Load FOVs for registration.
+    # Use dask for the projection: on zarr-backed data, `.max("z")` would be
+    # computed eagerly, loading the whole array into memory.
+    xim_well_reg = get_sim_from_ome_zarr_container(
+        ome_zarr_container,
+        resolution=registration_resolution_level,
+        transform_key=input_transform_key,
+        as_dask=reg_max_project_z,
+    )
 
     if reg_max_project_z:
         xim_well_reg = xim_well_reg.max("z")
