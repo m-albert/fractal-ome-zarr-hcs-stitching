@@ -3,6 +3,7 @@
 import logging
 import os
 import shutil
+from typing import Any
 
 import numpy as np
 from multiview_stitcher import (
@@ -40,7 +41,7 @@ def stitching_task(
     pre_registration_pruning_method: PreRegistrationPruningMethod = PreRegistrationPruningMethod.KEEPAXISALIGNED,  # noqa: E501
     registration_n_jobs: int = 16,
     fusion_n_jobs: int = 16,
-) -> None:
+) -> dict[str, Any] | None:
     """Stitches fields of view (FOV) in an OME-Zarr image.
 
     Registers and fuses FOVs specified in the Fractal FOV_ROI_table.
@@ -85,6 +86,7 @@ def stitching_task(
             runs out of memory during fusion, reduce this number.
             Default is 16.
     """
+    zarr_url = zarr_url.rstrip("/")
     logger.info(f"{zarr_url=}")
 
     # Open the OME-Zarr image and log several metadata attributes
@@ -236,7 +238,7 @@ def stitching_task(
     sims_fusion = [si_utils.sim_sel_coords(sim, sel_dict={'t': 0}) for sim in sims_fusion]
 
     # Determine output zarr url
-    well_url, old_img_path = zarr_url.rstrip("/").rsplit("/", 1)
+    well_url, old_img_path = zarr_url.rsplit("/", 1)
     output_zarr_url = f"{well_url}/{old_img_path}{output_group_suffix}"
     logger.info(f"Output fused path: {output_zarr_url}")
 
