@@ -3,20 +3,8 @@
 import logging
 import os
 import shutil
-from pathlib import Path
 
-import anndata as ad
 import numpy as np
-import zarr
-from fractal_tasks_core.ngff import load_NgffImageMeta
-from fractal_tasks_core.ngff.zarr_utils import ZarrGroupNotFoundError
-from fractal_tasks_core.pyramids import build_pyramid
-from fractal_tasks_core.roi import get_single_image_ROI
-from fractal_tasks_core.tables import write_table
-from fractal_tasks_core.tasks._zarr_utils import (
-    _split_well_path_image_path,
-    _update_well_metadata,
-)
 from multiview_stitcher import (
     fusion,
     misc_utils,
@@ -26,15 +14,15 @@ from multiview_stitcher import (
 )
 from multiview_stitcher import spatial_image_utils as si_utils
 from multiview_stitcher.mv_graph import NotEnoughOverlapError
-from ome_zarr import writer
-from ome_zarr.io import parse_url
+from ngio import open_ome_zarr_container, open_ome_zarr_well
+from ngio.utils import NgioFileNotFoundError
 from pydantic import validate_call
 
 from fractal_ome_zarr_hcs_stitching.utils import (
     PreRegistrationPruningMethod,
     StitchingChannelInputModel,
-    get_sim_from_multiscales,
     get_fov_sims_from_well_sim,
+    get_sim_from_ome_zarr_container,
 )
 
 logger = logging.getLogger(__name__)
@@ -99,24 +87,15 @@ def stitching_task(
     """
     logger.info(f"{zarr_url=}")
 
-    # Parse and log several NGFF-image metadata attributes
-    ngff_image_meta = load_NgffImageMeta(zarr_url)
-    logger.info(f"  Axes: {ngff_image_meta.axes_names}")
-    logger.info(f"  Number of pyramid levels: {ngff_image_meta.num_levels}")
-    logger.info(
-        f"Linear coarsening factor for YX axes: {ngff_image_meta.coarsening_xy}"
-    )
-    logger.info(
-        "Full-resolution ZYX pixel sizes (micrometer): "
-        f"{ngff_image_meta.get_pixel_sizes_zyx(level=0)}"
-    )
-    logger.info(
-        "  Coarsening-level-1 ZYX pixel sizes (micrometer): "
-        f"{ngff_image_meta.get_pixel_sizes_zyx(level=1)}"
-    )
+    # Open the OME-Zarr image and log several metadata attributes
+    ome_zarr_container = open_ome_zarr_container(zarr_url)
+    input_image = ome_zarr_container.get_image()
+    logger.info(f"  Axes: {input_image.axes}")
+    logger.info(f"  Pyramid levels: {ome_zarr_container.level_paths}")
+    logger.info(f"  Full-resolution pixel size: {input_image.pixel_size}")
 
     # Load FOV ROI table
-    fov_roi_table = ad.read_zarr(Path(zarr_url) / "tables/FOV_ROI_table").to_df()
+    fov_roi_table = ome_zarr_container.get_roi_table("FOV_ROI_table").dataframe
 
     # Set transform key for input tiles
     # (in OME-Zarr version <= 0.5 there's a single transform key for input tiles)
@@ -127,8 +106,10 @@ def stitching_task(
     ##############
 
     # Load FOVs for registration
-    xim_well_reg = get_sim_from_multiscales(
-        Path(zarr_url), resolution=registration_resolution_level
+    xim_well_reg = get_sim_from_ome_zarr_container(
+        ome_zarr_container,
+        resolution=registration_resolution_level,
+        transform_key=input_transform_key,
     )
 
     # Determine whether to perform registration on maximum projection in Z:
@@ -159,8 +140,8 @@ def stitching_task(
     logger.info(f"Registration spatial dims: {reg_spatial_dims}")
 
     # Make sure the requested channel is available in the OME-Zarr image
-    omero_channel = channel.get_omero_channel(zarr_url)
-    if omero_channel is None:
+    reg_channel_label = channel.get_channel_label(ome_zarr_container)
+    if reg_channel_label is None:
         logger.info(
             f"Skipping stitching for {zarr_url} because {channel} is "
             "not available in that OME-Zarr image"
@@ -177,7 +158,9 @@ def stitching_task(
             msims_reg,
             transform_key=input_transform_key,
             new_transform_key=fusion_transform_key,
-            reg_channel=omero_channel.label,
+            # Only this channel is used for registration; the obtained
+            # transforms are applied to all channels during fusion
+            reg_channel=reg_channel_label,
             registration_binning={dim: 1 for dim in reg_spatial_dims},
             pre_registration_pruning_method=pre_registration_pruning_method.get_pruning_method(),
             n_parallel_pairwise_regs=registration_n_jobs,
@@ -214,7 +197,9 @@ def stitching_task(
         xim_well = xim_well_reg
         sims_fusion = [msi_utils.get_sim_from_msim(msim) for msim in msims_reg]
     else:
-        xim_well = get_sim_from_multiscales(Path(zarr_url), resolution=0)
+        xim_well = get_sim_from_ome_zarr_container(
+            ome_zarr_container, resolution=0, transform_key=input_transform_key
+        )
         sims_fusion = get_fov_sims_from_well_sim(
             xim_well, fov_roi_table, transform_key=input_transform_key
         )
@@ -250,100 +235,84 @@ def stitching_task(
     sims_fusion = [si_utils.sim_sel_coords(sim, sel_dict={'t': 0}) for sim in sims_fusion]
 
     # Determine output zarr url
-    well_url, old_img_path = _split_well_path_image_path(zarr_url)
-    output_zarr_url = f"{well_url}/{zarr_url.split('/')[-1]}{output_group_suffix}"
+    well_url, old_img_path = zarr_url.rstrip("/").rsplit("/", 1)
+    output_zarr_url = f"{well_url}/{old_img_path}{output_group_suffix}"
     logger.info(f"Output fused path: {output_zarr_url}")
 
-    # Fuse directly to zarr at highest resolution (level 0)
-    # This writes only the full-resolution data without building a large dask graph
+    # Determine the output geometry (union of all registered tiles), so that
+    # the output image can be created before fusing into it
+    output_stack_properties = fusion.process_output_stack_properties(
+        sims_fusion,
+        output_spacing=si_utils.get_spacing_from_sim(sims_fusion[0]),
+        transform_key=fusion_transform_key,
+    )
+    # Spatial sizes come from the fusion geometry, others (e.g. c) from the input
+    output_shape = [
+        int(output_stack_properties["shape"][axis])
+        if axis in output_stack_properties["shape"]
+        else input_image.dimensions.get(axis)
+        for axis in input_image.axes
+    ]
+    logger.info(f"Output shape: {output_shape}")
+
+    # Create the output image with the same metadata (channels, pixel sizes,
+    # number of pyramid levels, NGFF version, chunks) as the input image.
+    # Channel metadata (labels, wavelength_ids, colors, windows) is copied over.
+    output_container = ome_zarr_container.derive_image(
+        store=output_zarr_url,
+        shape=output_shape,
+        chunks=input_image.chunks,
+        overwrite=True,
+        copy_labels=False,
+        copy_tables=False,
+    )
+    output_image = output_container.get_image()
+
+    # Fuse directly into the full-resolution (level 0) array of the output
+    # image. Fusion is performed chunk by chunk, without building a large dask
+    # graph. Chunks are aligned with the output array chunks so that parallel
+    # writes never touch the same chunk.
     logger.info("Started fusion computation (writing directly to zarr)")
     logger.info(f"Using {fusion_n_jobs} parallel jobs.")
 
-    fused = fusion.fuse(
-        sims_fusion,
-        transform_key=fusion_transform_key,
-        output_chunksize={dim: sims_fusion[0].data.chunksize[idim]
-                          for idim, dim in enumerate(sims_fusion[0].dims)},
-        output_spacing=si_utils.get_spacing_from_sim(sims_fusion[0]),
-        # fusion_func=fusion.max_fusion,
-        output_zarr_url=f"{output_zarr_url}/0",
-        zarr_options={
-            "ome_zarr": False,  # Don't use multiview-stitcher to create OME-Zarr metadata
-            "overwrite": True,
-        },
-        batch_options={
-            "batch_func": misc_utils.process_batch_using_joblib,
-            "n_batch": 1000,  # num of chunks to schedule at once in joblib
-            "batch_func_kwargs": {
-                "n_jobs": fusion_n_jobs,
+    block_fusion = fusion.prepare_block_fusion(
+        f"{output_zarr_url}/{output_container.level_paths[0]}",
+        fuse_kwargs={
+            "images": sims_fusion,
+            "transform_key": fusion_transform_key,
+            "output_stack_properties": output_stack_properties,
+            "output_chunksize": {
+                dim: output_image.chunks[output_image.axes.index(dim)]
+                for dim in sims_fusion[0].dims
+                if dim in output_image.axes
             },
         },
+        # The array was already created by ngio (derive_image) with the
+        # right zarr format, compression and metadata: write into it
+        create_output=False,
     )
+    for batch in misc_utils.ndindex_batches(
+        block_fusion["nblocks"],
+        1000,  # num of chunks to schedule at once in joblib
+    ):
+        misc_utils.process_batch_using_joblib(
+            block_fusion["func"], batch, n_jobs=fusion_n_jobs
+        )
 
     logger.info("Finished fusion at full resolution")
     logger.info("Started building resolution pyramid")
 
-    # Starting from on-disk full-resolution data, build and write to disk a
-    # pyramid of coarser levels
-    # Provide original chunksize to avoid "ValueError: Attempt to save array
-    # to zarr with irregular chunking, please call `arr.rechunk(...)` first."
-    build_pyramid(
-        zarrurl=output_zarr_url,
-        overwrite=True,
-        num_levels=ngff_image_meta.num_levels,
-        chunksize=sims_fusion[0].data.chunksize,
-        coarsening_xy=ngff_image_meta.coarsening_xy,
-        open_array_kwargs={"write_empty_chunks": False, "fill_value": 0},
-    )
-
-    # Attach OME-Zarr metadata to the fused image
-    store = parse_url(output_zarr_url, mode="w").store
-    output_group = zarr.group(store=store)
-    writer.write_multiscales_metadata(
-        group=output_group,
-        axes=ngff_image_meta.axes_names,
-        datasets=[
-            {
-                "path": fractal_ds.path,
-                "coordinateTransformations": [
-                    {
-                        "type": coordinateTransformation.type,
-                        "scale": coordinateTransformation.scale,
-                    }
-                    for coordinateTransformation in fractal_ds.coordinateTransformations
-                ],
-            }
-            for fractal_ds in ngff_image_meta.multiscales[0].datasets[
-                : ngff_image_meta.num_levels
-            ]
-        ],
-    )
-    output_group.attrs["omero"] = ngff_image_meta.omero.model_dump()
-
-    # Workaround: Manually add wavelength_id attr back to omero channel
-    original_omero_attrs = zarr.open(zarr_url).attrs["omero"]["channels"]
-    for i, omero_channel in enumerate(output_group.attrs["omero"]["channels"]):
-        omero_channel["wavelength_id"] = original_omero_attrs[i]["wavelength_id"]
-    output_attrs = output_group.attrs
-    output_group.attrs["omero"] = dict(output_attrs["omero"])
+    # Build the coarser pyramid levels from the on-disk full-resolution data
+    # (block averaging, as previously done by fractal-tasks-core)
+    output_image.consolidate(mode="coarsen")
 
     logger.info("Finished building resolution pyramid")
 
-    # Add ROI table to the image
-    ngff_image_meta.get_pixel_sizes_zyx(level=0)
-    pixels_ZYX = (
-        ngff_image_meta.multiscales[0]
-        .datasets[0]
-        .coordinateTransformations[0]
-        .scale[-3:]
-    )
-    image_ROI_table = get_single_image_ROI(fused.data.shape, pixels_ZYX=pixels_ZYX)
-    write_table(
-        output_group,
+    # Add ROI table covering the whole fused image
+    output_container.add_table(
         "well_ROI_table",  # Could also be image_ROI_table
-        image_ROI_table,
+        output_container.build_image_roi_table("image"),
         overwrite=True,
-        table_attrs={"type": "roi_table"},
     )
 
     ####################
@@ -359,18 +328,14 @@ def stitching_task(
             image_list_updates=[dict(zarr_url=output_zarr_url, origin=zarr_url)]
         )
         # Update the metadata of the the well
-        well_url, new_img_path = _split_well_path_image_path(output_zarr_url)
+        new_img_path = output_zarr_url.rsplit("/", 1)[1]
         try:
-            _update_well_metadata(
-                well_url=well_url,
-                old_image_path=old_img_path,
-                new_image_path=new_img_path,
-            )
-        except ZarrGroupNotFoundError:
+            open_ome_zarr_well(well_url).atomic_add_image(image_path=new_img_path)
+        except NgioFileNotFoundError:
             logger.debug(
                 f"{zarr_url} is not in an HCS plate. No well metadata got updated"
             )
-        except ValueError:
+        except ValueError:  # NgioValueError is a ValueError
             logger.debug(
                 f"Could not update well metadata, likely because "
                 f" {output_zarr_url} was already listed there."

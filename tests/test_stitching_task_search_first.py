@@ -71,11 +71,11 @@ def test_stitching_3d_on_mip_search_first(
         "shortest_paths_overlap_weighted": (2, 6, 4384, 14577),
         "no_pruning": (2, 6, 4385, 14578),
     }
-    with zarr.open(f"{search_first_ome_zarr_3d}_fused", mode="r") as zarr_group:
-        assert all([
-            abs(a - b) <= [0, 5][int(idim >= 2)] for idim, (a, b) in enumerate(zip(
-                zarr_group[0].shape, expected_shapes[pre_registration_pruning_method]))
-        ])
+    zarr_group = zarr.open_group(f"{search_first_ome_zarr_3d}_fused", mode="r")
+    assert all([
+        abs(a - b) <= [0, 5][int(idim >= 2)] for idim, (a, b) in enumerate(zip(
+            zarr_group["0"].shape, expected_shapes[pre_registration_pruning_method]))
+    ])
 
 
 @pytest.mark.parametrize(
@@ -108,21 +108,21 @@ def test_stitching_2d_search_first(
         (2, 1, 4366, 14576),
         (2, 1, 4389, 14577),
     ]
-    with zarr.open(f"{search_first_ome_zarr_2d}_fused", mode="r") as zarr_group:
-        # check expected and actual shape don't differ
-        assert all([
-            abs(a - b) <= [0, 5][int(idim >= 2)] for idim, (a, b) in enumerate(zip(
-                zarr_group[0].shape, expected_shapes[registration_resolution_level]))
-        ])
-        # Ensure the omero metadata is as expected (see #21):
-        assert "metadata" not in zarr_group.attrs["multiscales"][0]
-        assert zarr_group.attrs["omero"]["channels"][0]["wavelength_id"] == "A04_C01"
-        assert zarr_group.attrs["omero"]["channels"][1]["wavelength_id"] == "A03_C02"
+    zarr_group = zarr.open_group(f"{search_first_ome_zarr_2d}_fused", mode="r")
+    # check expected and actual shape don't differ
+    assert all([
+        abs(a - b) <= [0, 5][int(idim >= 2)] for idim, (a, b) in enumerate(zip(
+            zarr_group["0"].shape, expected_shapes[registration_resolution_level]))
+    ])
+    # Ensure the omero metadata is as expected (see #21):
+    assert "metadata" not in zarr_group.attrs["multiscales"][0]
+    assert zarr_group.attrs["omero"]["channels"][0]["wavelength_id"] == "A04_C01"
+    assert zarr_group.attrs["omero"]["channels"][1]["wavelength_id"] == "A03_C02"
 
     # Check that the 2 expected OME-Zarr images exist after the task
     well_group = "/".join(search_first_ome_zarr_2d.split("/")[:-1])
-    with zarr.open(well_group, mode="r") as zarr_group:
-        assert list(zarr_group.group_keys()) == ["0", "0_fused"]
+    zarr_group = zarr.open_group(well_group, mode="r")
+    assert sorted(zarr_group.group_keys()) == ["0", "0_fused"]
 
 
 def test_stitching_overwrite(
@@ -139,5 +139,5 @@ def test_stitching_overwrite(
     )
     assert image_list_updates is None
     well_group = "/".join(search_first_ome_zarr_2d.split("/")[:-1])
-    with zarr.open(well_group, mode="r") as zarr_group:
-        assert list(zarr_group.group_keys()) == ["0"]
+    zarr_group = zarr.open_group(well_group, mode="r")
+    assert sorted(zarr_group.group_keys()) == ["0"]
