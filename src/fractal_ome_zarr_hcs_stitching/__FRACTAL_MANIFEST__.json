@@ -18,6 +18,7 @@
         "2D",
         "3D"
       ],
+      "type": "parallel",
       "executable_parallel": "stitching_task.py",
       "meta_parallel": {
         "cpus_per_task": 1,
