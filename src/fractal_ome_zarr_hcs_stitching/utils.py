@@ -2,63 +2,63 @@
 
 import logging
 from enum import Enum
-from pathlib import Path
+from typing import Optional
 
-import dask.array as da
 import pandas as pd
-from fractal_tasks_core.channels import (
-    ChannelInputModel,
-    ChannelNotFoundError,
-    OmeroChannel,
-    get_channel_from_image_zarr,
-    get_omero_channel_list,
-)
-from fractal_tasks_core.ngff import load_NgffImageMeta
-from multiview_stitcher import msi_utils
 from multiview_stitcher import spatial_image_utils as si_utils
-from spatial_image import to_spatial_image
+from ngio import OmeZarrContainer
+from ngio.utils import NgioValueError
+from pydantic import BaseModel, ConfigDict, model_validator
 
 logger = logging.getLogger(__name__)
 
 
-def get_sim_from_multiscales(
-    multiscales_path: Path,
+def get_sim_from_ome_zarr_container(
+    ome_zarr_container: OmeZarrContainer,
     resolution: int = 0,
+    transform_key: str = "fractal_input",
+    as_dask: bool = False,
 ):
-    """Get a spatial image from a multiscales ngff zarr file
-    representing a given resolution level.
+    """Get a spatial image representing a given resolution level of an image.
 
     Parameters
     ----------
-    multiscales_path : Path
-        Path to the multiscales group in the Zarr file.
+    ome_zarr_container : ngio.OmeZarrContainer
+        OME-Zarr image container.
     resolution : int, optional
         Resolution level index, by default 0
+    transform_key : str, optional
+        Transform key to attach the (identity) input transform to.
+    as_dask : bool, optional
+        Back the spatial image by a dask array instead of the zarr array.
+        Needed for reductions such as `.max("z")`, which are computed eagerly
+        (i.e. load the whole array) on zarr-backed spatial images.
+        By default False.
 
     Returns:
     -------
-    spatial_image.SpatialImage
+    spatial-image (multiview-stitcher flavor)
     """
-    ngff_image_meta = load_NgffImageMeta(multiscales_path)
-    axes = ngff_image_meta.axes_names
-    spatial_dims = [dim for dim in axes if dim in ["z", "y", "x"]]
-    scales = ngff_image_meta.pixel_sizes_zyx
-
-    channel_names = [
-        oc.label for oc in get_omero_channel_list(image_zarr_path=multiscales_path)
-    ]
-
-    data = da.from_zarr(f"{multiscales_path / Path(str(resolution))}")
-
-    sim = to_spatial_image(
-        data,
-        dims=axes,
-        c_coords=channel_names,
-        scale={dim: scales[resolution][idim] for idim, dim in enumerate(spatial_dims)},
-        translation={dim: 0 for dim in spatial_dims},
+    image = ome_zarr_container.get_image(
+        path=ome_zarr_container.level_paths[resolution]
     )
+    axes = list(image.axes)
+    spatial_dims = [dim for dim in axes if dim in ["z", "y", "x"]]
+    pixel_size = image.pixel_size
 
-    return sim
+    return si_utils.get_sim_from_array(
+        # By default pass the zarr array directly: multiview-stitcher then
+        # reads only the regions it needs, and passes compact references to
+        # the zarr array (instead of dask graphs) to parallel fusion workers
+        image.get_as_dask() if as_dask else image.zarr_array,
+        dims=axes,
+        # multiview-stitcher identifies channels by their `c` coordinate,
+        # so channel labels are used (they must be unique within the image)
+        c_coords=image.channel_labels,
+        scale={dim: getattr(pixel_size, dim) for dim in spatial_dims},
+        translation={dim: 0 for dim in spatial_dims},
+        transform_key=transform_key,
+    )
 
 
 def get_fov_sims_from_well_sim(
@@ -99,7 +99,9 @@ def get_fov_sims_from_well_sim(
         )
 
         sim = si_utils.get_sim_from_array(
-            tile.data,
+            # Pass the DataArray, not `tile.data`: for zarr-backed tiles,
+            # `.data` would load the tile into memory
+            tile,
             dims=tile.dims,
             c_coords=xim_well.coords["c"].data,
             scale=si_utils.get_spacing_from_sim(tile),
@@ -112,31 +114,56 @@ def get_fov_sims_from_well_sim(
     return fov_sims
 
 
-class StitchingChannelInputModel(ChannelInputModel):
-    """Channel input for stitching.
+class StitchingChannelInputModel(BaseModel):
+    """Channel input for stitching."""
 
-    Attributes:
-        wavelength_id: Unique ID for the channel wavelength, e.g. `A01_C01`.
-            Can only be specified if label is not set.
-        label: Name of the channel. Can only be specified if wavelength_id is
-            not set.
+    # Same fields and validation as fractal-tasks-core's (v1) ChannelInputModel,
+    # so that existing workflows keep working.
+    # Attribute docstrings are used as field descriptions in the manifest.
+    model_config = ConfigDict(use_attribute_docstrings=True)
+
+    wavelength_id: Optional[str] = None
+    """
+    Unique ID for the channel wavelength, e.g. `A01_C01`.
+    Can only be specified if label is not set.
     """
 
-    def get_omero_channel(self, zarr_url) -> OmeroChannel:
-        """Get the omero channel from the zarr url"""
-        try:
-            return get_channel_from_image_zarr(
-                image_zarr_path=zarr_url,
-                wavelength_id=self.wavelength_id,
-                label=self.label,
+    label: Optional[str] = None
+    """
+    Name of the channel. Can only be specified if wavelength_id is not set.
+    """
+
+    @model_validator(mode="after")
+    def mutually_exclusive_channel_attributes(self):
+        """Check that exactly one of `label` or `wavelength_id` is set."""
+        # Setting both would also make ngio's `get_channel_idx` raise, which
+        # `get_channel_label` would misreport as "channel not found"
+        if (self.wavelength_id is None) == (self.label is None):
+            raise ValueError(
+                "One and only one of `wavelength_id` and `label` must be set "
+                f"(given: {self.wavelength_id=}, {self.label=})."
             )
-        except ChannelNotFoundError as e:
+        return self
+
+    def get_channel_label(
+        self, ome_zarr_container: OmeZarrContainer
+    ) -> Optional[str]:
+        """Get the label of the selected channel, or None if it is not found."""
+        try:
+            channel_idx = ome_zarr_container.get_channel_idx(
+                channel_label=self.label, wavelength_id=self.wavelength_id
+            )
+        except NgioValueError as e:
+            # Missing channel: the caller skips this image instead of failing
             logger.warning(
                 f"Channel with wavelength_id: {self.wavelength_id} "
                 f"and label: {self.label} not found, exit from the task.\n"
                 f"Original error: {e!s}"
             )
             return None
+        # Return the label (also when selecting by wavelength_id), as this is
+        # what multiview-stitcher uses to select the registration channel
+        return ome_zarr_container.channel_labels[channel_idx]
 
 
 class PreRegistrationPruningMethod(Enum):
